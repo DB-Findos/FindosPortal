@@ -1,0 +1,120 @@
+.advanced-search {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  gap: 24px;
+  overflow: hidden;
+}
+.query-builder {
+  width: 390px;
+  max-width: 45%;
+  min-width: 260px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-right: 8px;
+}
+.query-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+.query-section h2 {
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+.query-section h2 small {
+  color: var(--secondary);
+  font-weight: 400;
+}
+.query-section p {
+  font-size: 11px;
+  margin-bottom: 12px;
+}
+.query-section select,
+.query-section input:not([type='checkbox']) {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 9px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+  font-size: 12px;
+}
+.query-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+.query-row > select,
+.query-row > input {
+  flex: 1 1 110px;
+}
+.query-row > span {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.query-section fieldset {
+  min-width: 0;
+  margin: 14px 0 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 10px;
+}
+.query-section legend {
+  color: var(--secondary);
+  font-size: 11px;
+  padding: 0 5px;
+}
+.query-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.query-fields label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.query-fields input {
+  flex-shrink: 0;
+}
+.query-sort {
+  margin: 16px 0 8px;
+}
+.query-sort select {
+  margin-top: 8px;
+}
+.query-section form {
+  margin-top: 12px;
+}
+.query-output,
+.query-results {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+@media (max-width: 1100px) {
+  .advanced-search {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .query-builder {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    max-height: 45%;
+    flex-shrink: 0;
+  }
+}

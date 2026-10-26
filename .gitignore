@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+.npm-cache/
+*.log
+.neon/
+test-results/
+*.tsbuildinfo
+.imports/
+.mcp-tokens/
