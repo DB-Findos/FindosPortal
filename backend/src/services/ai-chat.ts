@@ -49,9 +49,17 @@ Bei Werkzeugfehlern deren Ursache korrigieren und erneut aufrufen. Benötigte fa
   const seenChanges = new Set<string>();
   const deadline = Date.now() + 240000;
   let calls = 0;
+  const attempts = new Map<string, number>();
   for (let round = 0; round < 12; round++) {
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
+    const finishing = round === 11 || calls >= 30 || remaining < 30000;
+    if (finishing)
+      messages.push({
+        role: 'system',
+        content:
+          'Schließe jetzt ab. Beschreibe nur tatsächlich erhaltene Ergebnisse. Wenn kein Vorschlag erstellt wurde, nenne konkret die fehlende Information oder den Werkzeugfehler. Behaupte niemals, dass nicht vorhandene Karten angezeigt werden.',
+      });
     let response: Response;
     try {
       response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -61,6 +69,7 @@ Bei Werkzeugfehlern deren Ursache korrigieren und erneut aufrufen. Benötigte fa
           model: process.env.OPENAI_MODEL || 'gpt-5-mini',
           messages,
           tools,
+          tool_choice: finishing ? 'none' : 'auto',
           parallel_tool_calls: false,
           response_format: { type: 'json_object' },
         }),
@@ -94,6 +103,14 @@ Bei Werkzeugfehlern deren Ursache korrigieren und erneut aufrufen. Benötigte fa
           if (call.function.name === 'commit_change')
             throw httpError(403, 'Änderungen nur per Übernahme-Button.');
           const args = JSON.parse(call.function.arguments);
+          const attemptKey = call.function.name + ':' + JSON.stringify(args);
+          const attempted = (attempts.get(attemptKey) || 0) + 1;
+          attempts.set(attemptKey, attempted);
+          if (attempted > 2)
+            throw httpError(
+              400,
+              'Identischer Aufruf wiederholt. Nutze vorhandene Ergebnisse, korrigiere die Parameter oder frage gezielt nach der fehlenden fachlichen Information.'
+            );
           const key = call.function.name === 'propose_change' ? JSON.stringify(args) : '';
           if (key && seenChanges.has(key))
             result = { alreadyProposed: true, message: 'Dieser Vorschlag wird bereits angezeigt.' };
@@ -113,6 +130,11 @@ Bei Werkzeugfehlern deren Ursache korrigieren und erneut aufrufen. Benötigte fa
             error instanceof SyntaxError
               ? { error: 'Werkzeugargumente müssen gültiges JSON sein.' }
               : toolError(error);
+          console.warn('AI tool failed', {
+            tool: call.function.name,
+            round: round + 1,
+            error: result,
+          });
         }
         let output = JSON.stringify(result);
         if (output.length > 60000)
@@ -140,8 +162,9 @@ Bei Werkzeugfehlern deren Ursache korrigieren und erneut aufrufen. Benötigte fa
     }
   }
   return {
-    reply:
-      'Die Untersuchung hat das Zeit- oder Werkzeuglimit erreicht. Bereits geprüfte Vorschläge stehen unten zur Übernahme bereit. Grenze die nächste Frage bei Bedarf ein.',
+    reply: changes.length
+      ? `${changes.length} geprüfte Änderungsvorschläge stehen unten zur Übernahme bereit. Die weitere Untersuchung wurde wegen des Zeit- oder Werkzeuglimits beendet.`
+      : 'Die Untersuchung konnte innerhalb des Zeit- oder Werkzeuglimits keinen gültigen Änderungsvorschlag erstellen. Es wurde nichts gespeichert. Bitte erneut versuchen; bei wiederholtem Fehler enthalten die Backend-Logs jetzt die betroffenen Werkzeugaufrufe.',
     changes,
     proposals: [],
     steps,
