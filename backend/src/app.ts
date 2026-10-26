@@ -16,7 +16,7 @@ import { mcpRouter } from './mcp/router.js';
 export const app = express();
 app.disable('x-powered-by');
 if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
-app.use(helmet(), express.json({ limit: '2mb' }), cookieParser());
+app.use(helmet(), express.json({ limit: '8mb' }), cookieParser());
 app.use('/mcp', mcpRouter);
 app.use('/api', (req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');

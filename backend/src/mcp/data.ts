@@ -5,8 +5,9 @@ import { compileSearch, searchDefinition } from '../services/search.js';
 import { permit, type Rights } from '../services/kpi-definitions.js';
 import { snapshot } from '../services/snapshot.js';
 import { httpError } from '../shared/errors.js';
+import { privateChatEntities } from '../services/chat-schema.js';
 
-export type Actor = { userId: string; rights: Rights; canCommit: boolean };
+export type Actor = { userId: string; rights: Rights; canCommit: boolean; conversationId?: string };
 export const versionFields = ['id', ...auditColumns];
 const privateFields = new Set(['password', 'password_hash']);
 export const readableFields = (entity: Entity) =>
@@ -83,6 +84,11 @@ export const recordInput = z
 export async function getRecord(actor: Actor, raw: unknown) {
   const input = recordInput.parse(raw),
     entity = entityName(input.entity);
+  if (privateChatEntities.has(entity))
+    throw httpError(
+      403,
+      'Private Chats über list_conversations, read_conversation und read_document abrufen.'
+    );
   permit(actor.rights, entity);
   const selected = input.fields ?? readableFields(entity).filter((f) => f !== 'data_base64');
   if (selected.some((f) => !readableFields(entity).includes(f)))

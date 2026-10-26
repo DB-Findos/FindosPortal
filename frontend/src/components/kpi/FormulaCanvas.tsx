@@ -5,8 +5,9 @@ interface Props {
   variables: KpiVariable[];
   cursor: number;
   onCursor: (index: number) => void;
+  onVariable?: (identifier: string) => void;
 }
-export default function FormulaCanvas({ tokens, variables, cursor, onCursor }: Props) {
+export default function FormulaCanvas({ tokens, variables, cursor, onCursor, onVariable }: Props) {
   const matches = new Map<number, number>(),
     stack: number[] = [];
   tokens.forEach((token, index) => {
@@ -32,7 +33,10 @@ export default function FormulaCanvas({ tokens, variables, cursor, onCursor }: P
           ('()'.includes(value) && !matches.has(index) ? 'unmatched' : '')
         }
         aria-label={`${value}${names[value] ? ' ' + names[value] : ''}, Cursor dahinter`}
-        onClick={() => onCursor(index + 1)}
+        onClick={() => {
+          onCursor(index + 1);
+          if (names[value]) onVariable?.(value);
+        }}
       >
         {names[value] ? (
           <>

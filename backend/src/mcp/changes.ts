@@ -18,6 +18,7 @@ import { snapshot } from '../services/snapshot.js';
 import { httpError } from '../shared/errors.js';
 import type { Actor } from './data.js';
 import type { DatabaseClient } from '../database/connection.js';
+import { privateChatEntities } from '../services/chat-schema.js';
 
 const target = { object_id: z.uuid().optional(), expected_version: z.uuid().optional() };
 const viewInput = z
@@ -65,6 +66,8 @@ function changeEntity(change: Change) {
 }
 async function validateChange(db: DatabaseClient, actor: Actor, change: Change) {
   const entity = changeEntity(change);
+  if (privateChatEntities.has(entity))
+    throw httpError(403, 'Chats nur über die Chat-Funktionen ändern.');
   const operation = change.kind === 'archive' ? 'delete' : change.object_id ? 'update' : 'create';
   permit(actor.rights, entity, operation);
   if (Boolean(change.object_id) !== Boolean(change.expected_version))

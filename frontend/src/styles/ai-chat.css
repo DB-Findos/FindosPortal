@@ -15,7 +15,7 @@
   top: var(--topbar-height);
   right: 0;
   bottom: 0;
-  width: min(400px, calc(100vw - 32px));
+  width: min(460px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--border);
@@ -46,6 +46,59 @@
   color: var(--muted);
   font-size: 12px;
   border-bottom: 1px solid var(--border);
+}
+.ai-chat-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  max-height: 30vh;
+  overflow: auto;
+  flex-shrink: 0;
+}
+.ai-chat-controls label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+}
+.ai-chat-controls select {
+  width: 100%;
+  min-width: 0;
+}
+.ai-chat-controls button {
+  align-self: end;
+}
+.ai-message-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+  font-size: 10px;
+  opacity: 0.85;
+}
+.ai-document {
+  display: block;
+  margin-top: 7px;
+  overflow-wrap: anywhere;
+}
+.ai-document small {
+  display: block;
+}
+.ai-attachments {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  min-width: 0;
+}
+.ai-attachments input {
+  max-width: 100%;
+  font-size: 11px;
+}
+.ai-chat form {
+  max-height: 32vh;
+  overflow: auto;
+  flex-shrink: 0;
 }
 .ai-chat-messages {
   flex: 1;
@@ -134,7 +187,7 @@
 }
 .ai-chat textarea {
   min-height: 42px;
-  resize: vertical;
+  resize: none;
 }
 .ai-chat form button {
   align-self: end;

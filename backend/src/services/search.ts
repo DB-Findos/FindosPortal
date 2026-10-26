@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { definitions, entityName, fields, type Entity } from '../entities.js';
 import { auditColumns } from '../repositories/entities.js';
 import { httpError } from '../shared/errors.js';
+import { privateChatEntities } from './chat-schema.js';
 
 const alias = z.string().regex(/^[a-z][a-z0-9_]{0,30}$/);
 const field = z.object({ alias, field: z.string().min(1).max(100) }).strict();
@@ -49,7 +50,7 @@ export function compileSearch(input: unknown, rights: Record<string, { can_read?
   const definition = searchDefinition.parse(input);
   const aliases = new Map<string, { entity: Entity; sql: string }>();
   const authorize = (entity: Entity) => {
-    if (entity === 'search_views' || !rights[entity]?.can_read)
+    if (entity === 'search_views' || privateChatEntities.has(entity) || !rights[entity]?.can_read)
       throw httpError(403, 'Keine Leseberechtigung für ' + entity);
   };
   const root = entityName(definition.entity);

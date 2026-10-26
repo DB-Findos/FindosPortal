@@ -1,20 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Bot, ChevronLeft, Send, Sparkles, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
-import { useApi } from '../../contexts/ApiContext';
-import type { FormulaDraft } from '../../types/kpi';
-import type { ChangeProposal } from '../../types/ai';
-import ChangeProposalCard from './ChangeProposalCard';
-
-type FormulaProposal = FormulaDraft & { explanation?: string };
-type ChatMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-  proposals?: FormulaProposal[];
-  changes?: ChangeProposal[];
-  steps?: string[];
-};
-
+import { useChat } from '../../hooks/useChat';
+import ChatControls from './ChatControls';
+import ChatMessageItem from './ChatMessageItem';
 function viewContext(path: string) {
   if (path.includes('/settings/kpis'))
     return { view: 'KPI Formula Editor & Reporting', entity: null };
@@ -25,100 +14,14 @@ function viewContext(path: string) {
   if (path.includes('/settings/design')) return { view: 'Design & Layout', entity: null };
   return { view: 'Main Page', entity: null };
 }
-
 export default function AiChatSidebar() {
-  const { request } = useApi();
-  const location = useLocation();
-  const context = useMemo(() => viewContext(location.pathname), [location.pathname]);
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: 'assistant',
-      content:
-        'Ich kann Daten und Beziehungen untersuchen, Kennzahlen berechnen und Änderungen vorbereiten. Beschreibe deine Frage oder die gewünschte Änderung.',
-    },
-  ]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  async function send() {
-    const content = draft.trim();
-    if (!content || busy) return;
-    const next = [...messages, { role: 'user' as const, content }];
-    setMessages(next);
-    setDraft('');
-    setBusy(true);
-    setError('');
-    try {
-      const result = await request<{
-        reply: string;
-        proposals: FormulaProposal[];
-        changes: ChangeProposal[];
-        steps: string[];
-      }>('/ai/chat', 'POST', {
-        messages: next.slice(-12).map(({ role, content }) => ({ role, content })),
-        context: { path: location.pathname, ...context },
-      });
-      setMessages((current) => [
-        ...current,
-        {
-          role: 'assistant',
-          content: result.reply,
-          proposals: result.proposals,
-          changes: result.changes,
-          steps: result.steps,
-        },
-      ]);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Die KI-Antwort ist fehlgeschlagen.');
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function commitProposal(proposal: ChangeProposal) {
-    setBusy(true);
-    setError('');
-    try {
-      await request('/ai/changes/commit', 'POST', { token: proposal.token });
-      window.dispatchEvent(
-        new CustomEvent('portal-data-changed', { detail: { entity: proposal.entity } })
-      );
-      setMessages((current) => [
-        ...current,
-        { role: 'assistant', content: `Übernommen: ${proposal.title}` },
-      ]);
-    } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : 'Die Änderung konnte nicht übernommen werden.'
-      );
-      throw reason;
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function commit(formula: FormulaProposal) {
-    setBusy(true);
-    setError('');
-    try {
-      const { explanation: _explanation, ...payload } = formula;
-      await request('/ai/formulas/commit', 'POST', payload);
-      setMessages((current) => [
-        ...current,
-        {
-          role: 'assistant',
-          content: `Die KPI „${formula.name}“ wurde erstellt und ist sofort im KPI-Bereich verfügbar.`,
-        },
-      ]);
-    } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : 'Die Formel konnte nicht erstellt werden.'
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
+  const location = useLocation(),
+    [open, setOpen] = useState(false);
+  const context = useMemo(
+    () => ({ path: location.pathname, ...viewContext(location.pathname) }),
+    [location.pathname]
+  );
+  const chat = useChat(open, context);
   if (!open)
     return (
       <button className="ai-chat-toggle" onClick={() => setOpen(true)} aria-label="KI-Chat öffnen">
@@ -135,55 +38,96 @@ export default function AiChatSidebar() {
           <X size={18} />
         </button>
       </header>
+      <ChatControls
+        conversations={chat.conversations}
+        conversationId={chat.conversation?.objectId}
+        models={chat.models}
+        model={chat.model}
+        effort={chat.effort}
+        busy={chat.busy}
+        nextOffset={chat.nextOffset}
+        onConversation={(id) => void chat.select(id)}
+        onNew={chat.newChat}
+        onModel={chat.chooseModel}
+        onEffort={chat.setEffort}
+        onMore={() => void chat.loadMore().catch((e) => chat.setError((e as Error).message))}
+      />
       <div className="ai-chat-context">
         {context.view}
         {context.entity ? ` · ${context.entity}` : ''}
       </div>
       <div className="ai-chat-messages">
-        {messages.map((message, index) => (
-          <article key={index} className={'ai-message ' + message.role}>
-            <p>{message.content}</p>
-            {!!message.steps?.length && (
-              <small>{message.steps.length} Daten- und Validierungsschritte ausgeführt</small>
-            )}
-            {message.changes?.map((proposal) => (
-              <ChangeProposalCard
-                key={proposal.token}
-                proposal={proposal}
-                busy={busy}
-                onCommit={commitProposal}
-              />
-            ))}
-            {message.proposals?.map((proposal, proposalIndex) => (
-              <div className="ai-proposal" key={proposalIndex}>
-                <strong>Formelvorschlag: {proposal.name}</strong>
-                <code>{proposal.TextEditor}</code>
-                {proposal.explanation && <small>{proposal.explanation}</small>}
-                <button disabled={busy} onClick={() => void commit(proposal)}>
-                  Formel übernehmen
-                </button>
-              </div>
-            ))}
-          </article>
+        {!chat.messages.length && (
+          <p className="muted">
+            Frage zu deinen Daten oder beschreibe eine gewünschte Änderung. Nachrichten und
+            Dokumente werden in dieser Konversation gespeichert.
+          </p>
+        )}
+        {chat.messages.map((message) => (
+          <ChatMessageItem
+            key={message.objectId}
+            message={message}
+            busy={chat.busy}
+            onCommit={chat.commit}
+          />
         ))}
-        {busy && <article className="ai-message assistant muted">KI denkt nach …</article>}
+        {chat.busy && (
+          <article className="ai-message assistant muted" role="status">
+            Wird verarbeitet …
+          </article>
+        )}
       </div>
-      {error && <div className="ai-chat-error">{error}</div>}
+      {chat.error && (
+        <div className="ai-chat-error" role="alert">
+          {chat.error}
+        </div>
+      )}
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          void send();
+          void chat.send();
         }}
       >
         <textarea
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="Frage zum Datenmodell oder beschreibe eine KPI …"
+          disabled={chat.busy}
+          value={chat.draft}
+          onChange={(e) => chat.setDraft(e.target.value)}
+          maxLength={16000}
+          placeholder="Nachricht …"
           rows={3}
         />
-        <button type="submit" disabled={busy || !draft.trim()}>
+        <button
+          type="submit"
+          disabled={chat.busy || !chat.model || (!chat.draft.trim() && !chat.files.length)}
+        >
           <Send size={16} /> Senden
         </button>
+        <label className="ai-attachments">
+          Dokumente anhängen · max. 5 MB je Datei
+          <input
+            type="file"
+            disabled={chat.busy}
+            multiple
+            accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json"
+            onChange={(e) => {
+              const selected = Array.from(e.target.files || []);
+              if (selected.length > 10 || selected.some((f) => f.size > 5 * 1024 * 1024)) {
+                chat.setError('Maximal 10 Dateien mit jeweils bis zu 5 MB.');
+                e.target.value = '';
+                return;
+              }
+              chat.setFiles(selected);
+            }}
+          />
+        </label>
+        {!!chat.files.length && (
+          <small className="ai-attachments">
+            {chat.files.map((f) => f.name).join(', ')}{' '}
+            <button type="button" disabled={chat.busy} onClick={() => chat.setFiles([])}>
+              Entfernen
+            </button>
+          </small>
+        )}
       </form>
     </aside>
   );

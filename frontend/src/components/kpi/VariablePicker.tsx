@@ -1,37 +1,46 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Formula, KpiCatalog, KpiVariable } from '../../types/kpi';
 
 interface Props {
   catalog: KpiCatalog;
   formulas: Formula[];
   onAdd: (v: Omit<KpiVariable, 'identifier'>) => void;
+  initial?: KpiVariable;
+  onCancelEdit?: () => void;
 }
 
-export default function VariablePicker({ catalog, formulas, onAdd }: Props) {
-  const [kind, setKind] = useState('metric');
-  const [metric, setMetric] = useState('');
-  const [aggregation, setAggregation] = useState<'MONTH' | 'LTM' | 'YTD'>('MONTH');
-  const [prior, setPrior] = useState(false);
-  const [dimension, setDimension] = useState('');
-  const [entity, setEntity] = useState(catalog.sources[0]?.entity || '');
-  const [field, setField] = useState('');
-  const [filterField, setFilterField] = useState('');
-  const [filterOperator, setFilterOperator] = useState<'equals' | 'context_company'>('equals');
-  const [filterValue, setFilterValue] = useState('');
-  const [target, setTarget] = useState('');
+export default function VariablePicker({ catalog, formulas, onAdd, initial, onCancelEdit }: Props) {
+  const [kind, setKind] = useState(
+    initial?.aggregation === 'FIXED' ? 'fixed' : initial?.aggregation === 'KPI' ? 'kpi' : 'metric'
+  );
+  const [metric, setMetric] = useState(
+    initial?.metric_number == null ? '' : String(initial.metric_number)
+  );
+  const [aggregation, setAggregation] = useState<'MONTH' | 'LTM' | 'YTD'>(
+    initial && ['MONTH', 'LTM', 'YTD'].includes(initial.aggregation)
+      ? (initial.aggregation as 'MONTH' | 'LTM' | 'YTD')
+      : 'MONTH'
+  );
+  const [prior, setPrior] = useState(initial?.prior_year || false);
+  const [dimension, setDimension] = useState(initial?.dimension || '');
+  const [entity, setEntity] = useState(
+    initial?.aggregation === 'FIXED' ? initial.entity : catalog.sources[0]?.entity || ''
+  );
+  const [field, setField] = useState(initial?.field || catalog.sources[0]?.fields[0] || '');
+  const [filterField, setFilterField] = useState(initial?.filter?.field || '');
+  const [filterOperator, setFilterOperator] = useState<'equals' | 'context_company'>(
+    initial?.filter?.operator || 'equals'
+  );
+  const [filterValue, setFilterValue] = useState(initial?.filter?.value || '');
+  const [target, setTarget] = useState(initial?.target_kpi_id || '');
   const source = catalog.sources.find((item) => item.entity === entity);
   const selectedMetric = catalog.metrics.find((item) => String(item.metric_number) === metric);
-  useEffect(() => {
-    setField(source?.fields[0] || '');
-    setFilterField('');
-    setFilterValue('');
-  }, [entity, source?.fields]);
   const valid =
     kind === 'metric'
       ? Boolean(selectedMetric)
       : kind === 'fixed'
         ? Boolean(
-            field && (!filterField || filterOperator === 'context_company' || filterValue.trim())
+            source?.fields.includes(field) && (!filterField || filterOperator === 'context_company' || filterValue.trim())
           )
         : Boolean(target);
   function add() {
@@ -63,11 +72,14 @@ export default function VariablePicker({ catalog, formulas, onAdd }: Props) {
   }
   return (
     <section className="kpi-section">
-      <h3>Variable hinzufügen</h3>
+      <h3>{initial ? `Variable ${initial.identifier} bearbeiten` : 'Variable hinzufügen'}</h3>
       <div className="kpi-fields">
         <label>
           Quelle
-          <select value={kind} onChange={(event) => setKind(event.target.value)}>
+          <select value={kind} onChange={(event) => {
+            setKind(event.target.value);
+            if(event.target.value==='fixed' && !source?.fields.includes(field)) setField(source?.fields[0]||'');
+          }}>
             <option value="metric">MetricData · monatlich</option>
             <option value="fixed">Entity-Feld · fester Wert</option>
             <option value="kpi">Definierte KPI</option>
@@ -125,7 +137,19 @@ export default function VariablePicker({ catalog, formulas, onAdd }: Props) {
           <>
             <label>
               Entity
-              <select value={entity} onChange={(event) => setEntity(event.target.value)}>
+              <select
+                value={entity}
+                onChange={(event) => {
+                  setEntity(event.target.value);
+                  setField(
+                    catalog.sources.find((item) => item.entity === event.target.value)?.fields[0] ||
+                      ''
+                  );
+                  setFilterField('');
+                  setFilterValue('');
+                  setFilterOperator('equals');
+                }}
+              >
                 {catalog.sources.map((item) => (
                   <option key={item.entity} value={item.entity}>
                     {item.label}
@@ -197,8 +221,13 @@ export default function VariablePicker({ catalog, formulas, onAdd }: Props) {
         )}
       </div>
       <button type="button" className="secondary" disabled={!valid} onClick={add}>
-        + Variable in Formel einfügen
+        {initial ? 'Variable updaten' : '+ Variable in Formel einfügen'}
       </button>
+      {initial && (
+        <button type="button" className="secondary" onClick={onCancelEdit}>
+          Neue Variable hinzufügen
+        </button>
+      )}
     </section>
   );
 }

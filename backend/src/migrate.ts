@@ -176,6 +176,14 @@ try {
     );
     console.log('Applied 010-kpi-context-fixed-variables: fixed variables use report context.');
   }
+  if (!applied.has('011-chat-history')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(path.join(projectRoot, 'backend/migrations/011-chat-history.sql'), 'utf8')
+    );
+    await client.query("INSERT INTO portal.schema_migrations(name) VALUES ('011-chat-history')");
+    console.log('Applied 011-chat-history: conversations, messages, documents and attachments.');
+  }
   await client.query(process.argv.includes('--preview') ? 'ROLLBACK' : 'COMMIT');
   console.log(
     process.argv.includes('--preview')

@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import { imageInput } from './services/images.js';
 import { variableInput } from './services/kpi-schema.js';
+import { chatDefinitions } from './services/chat-schema.js';
 const text = z.string().trim().min(1).max(500);
 const optional = z.string().trim().max(2000).nullable().optional();
 const uuid = z.uuid();
 export const definitions = {
+  ...chatDefinitions,
   kpi_formulas: {
     label: 'KPI Formulas',
     schema: z.object({

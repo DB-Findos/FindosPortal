@@ -71,6 +71,8 @@ export default function FormulaEditor({
     insert(identifier);
   }
   const used = draft.variables.filter((v) => tokens.includes(v.identifier));
+  const [editingVariable, setEditingVariable] = useState<string | null>(null);
+  const selectedVariable = draft.variables.find((v) => v.identifier === editingVariable);
   function input(): FormulaDraft {
     return {
       name: draft.name,
@@ -201,6 +203,7 @@ export default function FormulaEditor({
               variables={draft.variables}
               cursor={cursor}
               onCursor={setCursor}
+              onVariable={setEditingVariable}
             />
           </div>
           {err('TextEditor')}
@@ -270,9 +273,22 @@ export default function FormulaEditor({
           <code className="formula-code">{tokens.join(' ') || '—'}</code>
         </section>
         <VariablePicker
+          key={selectedVariable?.identifier || 'new-variable'}
+          initial={selectedVariable}
+          onCancelEdit={() => setEditingVariable(null)}
           catalog={catalog}
           formulas={formulas.filter((f) => f.objectId !== initial?.objectId)}
-          onAdd={addVariable}
+          onAdd={(value) => {
+            if (!selectedVariable) return addVariable(value);
+            change(
+              'variables',
+              draft.variables.map((v) =>
+                v.identifier === selectedVariable.identifier
+                  ? { ...value, identifier: v.identifier }
+                  : v
+              )
+            );
+          }}
         />
         <section className="kpi-section" {...errors.inputProps('variables')} tabIndex={-1}>
           <h3>VariableMap</h3>
@@ -310,8 +326,8 @@ export default function FormulaEditor({
             })}
           </div>
           <small>
-            Nur in der Formel verwendete Variablen werden gespeichert. Änderungen an einer Quelle:
-            neuen Baustein hinzufügen und den alten ersetzen.
+            Nur verwendete Variablen werden gespeichert. Zum Bearbeiten einen Variablenbaustein in
+            der Formel anklicken. Änderungen gelten für alle Vorkommen dieser Variable.
           </small>
         </section>
         <section className="kpi-section">

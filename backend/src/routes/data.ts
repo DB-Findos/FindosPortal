@@ -15,13 +15,17 @@ import {
   auditColumns,
 } from '../repositories/entities.js';
 import { httpError, fieldError } from '../shared/errors.js';
+import { privateChatEntities } from '../services/chat-schema.js';
 export const dataRouter = Router();
 dataRouter.use(authenticate);
 dataRouter.get('/entities', async (req, res) => {
   const rights = await permissions(req.userId!);
   res.json(
     Object.entries(definitions)
-      .filter(([name]) => name !== 'search_views' && rights[name]?.can_read)
+      .filter(
+        ([name]) =>
+          name !== 'search_views' && !privateChatEntities.has(name) && rights[name]?.can_read
+      )
       .map(([name, def]) => ({
         name,
         label: def.label,
@@ -38,6 +42,8 @@ dataRouter.use('/data/:entity', async (req, _res, next) => {
       { GET: 'read', POST: 'create', PATCH: 'update', DELETE: 'delete' } as Record<string, string>
     )[req.method];
   await requirePermission(req.userId!, entity, action || 'invalid');
+  if (privateChatEntities.has(entity))
+    throw httpError(403, 'Private Chats nur über die Chat-Funktionen abrufen.');
   if (entity === 'search_views')
     throw httpError(403, 'Views werden über die Advanced Search verwaltet.');
   if (
