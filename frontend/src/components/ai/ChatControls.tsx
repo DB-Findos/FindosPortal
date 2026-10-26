@@ -37,6 +37,7 @@ export default function ChatControls({
     medium: 'Mittel',
     high: 'Hoch',
     xhigh: 'Sehr hoch',
+    max: 'Maximal',
   };
   return (
     <div

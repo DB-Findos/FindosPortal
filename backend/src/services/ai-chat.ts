@@ -53,6 +53,9 @@ Bei Werkzeugfehlern deren Ursache korrigieren und erneut aufrufen. Benötigte fa
     ...input.messages,
   ];
   const changes: ChangeProposal[] = [];
+  // New model families require Responses for reasoning with function tools.
+  const useResponses = /^gpt-(6[.-]|5\.6[.-])/.test(selection.model);
+  const responseInput: Record<string, unknown>[] = messages.map((message) => ({ ...message }));
   const documentIds: string[] = [];
   const steps: string[] = [];
   const seenChanges = new Set<string>();
@@ -69,22 +72,40 @@ Bei Werkzeugfehlern deren Ursache korrigieren und erneut aufrufen. Benötigte fa
         content:
           'Schließe jetzt ab. Beschreibe nur tatsächlich erhaltene Ergebnisse. Wenn kein Vorschlag erstellt wurde, nenne konkret die fehlende Information oder den Werkzeugfehler. Behaupte niemals, dass nicht vorhandene Karten angezeigt werden.',
       });
+    if (finishing && useResponses) responseInput.push({ ...messages[messages.length - 1] });
     let response: Response;
     try {
-      response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: selection.model,
-          ...(selection.reasoning ? { reasoning_effort: selection.effort } : {}),
-          messages,
-          tools,
-          tool_choice: finishing ? 'none' : 'auto',
-          parallel_tool_calls: false,
-          response_format: { type: 'json_object' },
-        }),
-        signal: AbortSignal.timeout(Math.min(remaining, 90000)),
-      });
+      response = await fetch(
+        'https://api.openai.com/v1/' + (useResponses ? 'responses' : 'chat/completions'),
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            useResponses
+              ? {
+                  model: selection.model,
+                  reasoning: { effort: selection.effort },
+                  input: responseInput,
+                  tools: tools.map((tool) => ({ type: 'function', ...tool.function })),
+                  tool_choice: finishing ? 'none' : 'auto',
+                  parallel_tool_calls: false,
+                  text: { format: { type: 'json_object' } },
+                  store: false,
+                  include: ['reasoning.encrypted_content'],
+                }
+              : {
+                  model: selection.model,
+                  ...(selection.reasoning ? { reasoning_effort: selection.effort } : {}),
+                  messages,
+                  tools,
+                  tool_choice: finishing ? 'none' : 'auto',
+                  parallel_tool_calls: false,
+                  response_format: { type: 'json_object' },
+                }
+          ),
+          signal: AbortSignal.timeout(Math.min(remaining, 90000)),
+        }
+      );
     } catch {
       if (changes.length || documentIds.length) break;
       throw httpError(502, 'Die KI-Anfrage hat zu lange gedauert. Bitte erneut versuchen.');
@@ -105,8 +126,40 @@ Bei Werkzeugfehlern deren Ursache korrigieren und erneut aufrufen. Benötigte fa
         'Die KI-Antwort konnte nicht erzeugt werden (OpenAI HTTP ' + response.status + ').'
       );
     }
-    const payload = (await response.json()) as { choices?: { message?: Message }[] };
-    const answer = payload.choices?.[0]?.message;
+    const payload = (await response.json()) as {
+      choices?: { message?: Message }[];
+      status?: string;
+      output?: (Record<string, unknown> & {
+        type: string;
+        call_id?: string;
+        name?: string;
+        arguments?: string;
+        content?: { type: string; text?: string }[];
+      })[];
+    };
+    let answer = payload.choices?.[0]?.message;
+    if (useResponses) {
+      if (payload.status !== 'completed' || !payload.output?.length)
+        throw httpError(502, 'Die KI lieferte keine vollständige Antwort. Bitte erneut versuchen.');
+      // Preserve reasoning items (including encrypted content) between tool rounds.
+      responseInput.push(...payload.output);
+      answer = {
+        role: 'assistant',
+        content: payload.output
+          .filter((item) => item.type === 'message')
+          .flatMap((item) => item.content || [])
+          .filter((part) => part.type === 'output_text')
+          .map((part) => part.text || '')
+          .join(''),
+        tool_calls: payload.output
+          .filter((item) => item.type === 'function_call')
+          .map((item) => ({
+            id: item.call_id!,
+            type: 'function',
+            function: { name: item.name!, arguments: item.arguments! },
+          })),
+      };
+    }
     if (!answer) throw httpError(502, 'Die KI lieferte keine Antwort.');
     if (answer.tool_calls?.length) {
       messages.push({ role: 'assistant', content: answer.content, tool_calls: answer.tool_calls });
@@ -162,6 +215,8 @@ Bei Werkzeugfehlern deren Ursache korrigieren und erneut aufrufen. Benötigte fa
             error: 'Ergebnis zu groß. Weniger Felder/kleinere Seite oder engere Filter verwenden.',
           });
         messages.push({ role: 'tool', tool_call_id: call.id, content: output });
+        if (useResponses)
+          responseInput.push({ type: 'function_call_output', call_id: call.id, output });
       }
       continue;
     }
@@ -179,6 +234,7 @@ Bei Werkzeugfehlern deren Ursache korrigieren und erneut aufrufen. Benötigte fa
             'Bitte antworte als gültiges JSON mit dem String-Feld reply. Änderungsvorschläge müssen über propose_change erstellt werden.',
         }
       );
+      if (useResponses) responseInput.push({ ...messages[messages.length - 1] });
     }
   }
   return {

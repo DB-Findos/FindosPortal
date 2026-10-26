@@ -1,8 +1,21 @@
 import { z } from 'zod';
 import { httpError } from '../shared/errors.js';
-export const reasoningEffort = z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+export const reasoningEffort = z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
 export function chatModels() {
   const defaults = [
+    { id: 'gpt-6-astra', label: 'GPT-6 Astra', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+    { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+    ...[
+      ['gpt-6-sol', 'GPT-6 Sol'],
+      ['gpt-6-luna', 'GPT-6 Luna'],
+      ['gpt-5.6-sol', 'GPT-5.6 Sol'],
+      ['gpt-5.6-terra', 'GPT-5.6 Terra'],
+      ['gpt-5.6-luna', 'GPT-5.6 Luna'],
+    ].map(([id, label]) => ({
+      id,
+      label,
+      efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+    })),
     { id: 'gpt-5.5', label: 'GPT-5.5', efforts: ['none', 'low', 'medium', 'high', 'xhigh'] },
     { id: 'gpt-5.4', label: 'GPT-5.4', efforts: ['none', 'low', 'medium', 'high', 'xhigh'] },
     {

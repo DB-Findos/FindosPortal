@@ -1,5 +1,7 @@
 # Persistenter Chat
 
+GPT-6 und GPT-5.6 verwenden die Responses API mit Function Calling. Reasoning-Items werden einschließlich verschlüsseltem Kontext zwischen Werkzeugrunden weitergereicht (`store: false`). Ältere Modelle verwenden weiterhin Chat Completions. Die Modellfreigabe des verwendeten OpenAI-Projekts bleibt Voraussetzung.
+
 Migration `011-chat-history` ergänzt vier historisierte Entities:
 
 | Entity | Inhalt |
@@ -17,6 +19,8 @@ Der Server speichert zuerst die Nutzernachricht und lädt dann den **vollständi
 
 Oben im Chat lassen sich ältere Konversationen laden und fortsetzen. Modell und Effort gelten für die nächste Nachricht und werden sowohl an der Konversation als auch an jeder Nachricht gespeichert. Standardmäßig verfügbar:
 
+- `gpt-6-astra`, `gpt-6.1-sol`: low, medium, high, xhigh, max
+- `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`: none, low, medium, high, xhigh, max
 - `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.2`: none, low, medium, high, xhigh
 - `gpt-5-mini`: minimal, low, medium, high
 - `gpt-5`: minimal, low, medium, high
