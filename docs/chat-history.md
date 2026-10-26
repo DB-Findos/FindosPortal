@@ -17,6 +17,7 @@ Der Server speichert zuerst die Nutzernachricht und lädt dann den **vollständi
 
 Oben im Chat lassen sich ältere Konversationen laden und fortsetzen. Modell und Effort gelten für die nächste Nachricht und werden sowohl an der Konversation als auch an jeder Nachricht gespeichert. Standardmäßig verfügbar:
 
+- `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.2`: none, low, medium, high, xhigh
 - `gpt-5-mini`: minimal, low, medium, high
 - `gpt-5`: minimal, low, medium, high
 - `gpt-4.1`: none (kein Reasoning-Parameter)

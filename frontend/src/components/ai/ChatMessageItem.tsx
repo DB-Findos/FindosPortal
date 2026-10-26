@@ -1,3 +1,5 @@
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { ChatMessage } from '../../types/ai';
 import ChangeProposalCard from './ChangeProposalCard';
 export default function ChatMessageItem({
@@ -26,7 +28,25 @@ export default function ChatMessageItem({
           </span>
         )}
       </div>
-      <p role={message.status === 'error' ? 'alert' : undefined}>{message.content}</p>
+      <div className="ai-message-content" role={message.status === 'error' ? 'alert' : undefined}>
+        {message.role === 'assistant' ? (
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              img: () => null,
+              a: ({ children, href }) => (
+                <a href={href} target="_blank" rel="noopener noreferrer">
+                  {children}
+                </a>
+              ),
+            }}
+          >
+            {message.content}
+          </ReactMarkdown>
+        ) : (
+          <p>{message.content}</p>
+        )}
+      </div>
       {message.files?.map((file) => (
         <a key={file.objectId} className="ai-document" href={file.url} download>
           {file.name} · {(file.size_bytes / 1024).toFixed(0)} KB

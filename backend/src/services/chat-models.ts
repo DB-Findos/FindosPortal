@@ -3,6 +3,14 @@ import { httpError } from '../shared/errors.js';
 export const reasoningEffort = z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
 export function chatModels() {
   const defaults = [
+    { id: 'gpt-5.5', label: 'GPT-5.5', efforts: ['none', 'low', 'medium', 'high', 'xhigh'] },
+    { id: 'gpt-5.4', label: 'GPT-5.4', efforts: ['none', 'low', 'medium', 'high', 'xhigh'] },
+    {
+      id: 'gpt-5.4-mini',
+      label: 'GPT-5.4 mini',
+      efforts: ['none', 'low', 'medium', 'high', 'xhigh'],
+    },
+    { id: 'gpt-5.2', label: 'GPT-5.2', efforts: ['none', 'low', 'medium', 'high', 'xhigh'] },
     { id: 'gpt-5-mini', label: 'GPT-5 mini', efforts: ['minimal', 'low', 'medium', 'high'] },
     { id: 'gpt-5', label: 'GPT-5', efforts: ['minimal', 'low', 'medium', 'high'] },
     { id: 'gpt-4.1', label: 'GPT-4.1', efforts: ['none'] },

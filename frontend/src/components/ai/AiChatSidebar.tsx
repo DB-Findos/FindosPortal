@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
-import { Bot, ChevronLeft, Send, Sparkles, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, Sparkles, X, Maximize2, Minimize2, PanelRight } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useChat } from '../../hooks/useChat';
 import ChatControls from './ChatControls';
 import ChatMessageItem from './ChatMessageItem';
+import ChatComposer from './ChatComposer';
 function viewContext(path: string) {
   if (path.includes('/settings/kpis'))
     return { view: 'KPI Formula Editor & Reporting', entity: null };
@@ -14,14 +15,25 @@ function viewContext(path: string) {
   if (path.includes('/settings/design')) return { view: 'Design & Layout', entity: null };
   return { view: 'Main Page', entity: null };
 }
+
 export default function AiChatSidebar() {
-  const location = useLocation(),
-    [open, setOpen] = useState(false);
+  const location = useLocation();
+  const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const scroll = useRef<HTMLDivElement>(null);
+  const nearBottom = useRef(true);
   const context = useMemo(
     () => ({ path: location.pathname, ...viewContext(location.pathname) }),
     [location.pathname]
   );
   const chat = useChat(open, context);
+  useEffect(() => {
+    nearBottom.current = true;
+  }, [chat.conversation?.objectId, open]);
+  useEffect(() => {
+    if (scroll.current && nearBottom.current)
+      scroll.current.scrollTop = scroll.current.scrollHeight;
+  }, [chat.messages, chat.busy, open]);
   if (!open)
     return (
       <button className="ai-chat-toggle" onClick={() => setOpen(true)} aria-label="KI-Chat öffnen">
@@ -29,14 +41,33 @@ export default function AiChatSidebar() {
       </button>
     );
   return (
-    <aside className="ai-chat" aria-label="KI-Chat">
-      <header>
-        <span>
-          <Bot size={18} /> Findos KI
-        </span>
-        <button onClick={() => setOpen(false)} aria-label="KI-Chat schließen">
-          <X size={18} />
-        </button>
+    <aside className={'ai-chat' + (expanded ? ' ai-chat-expanded' : '')} aria-label="KI-Chat">
+      <header className="ai-chat-header">
+        <div className="ai-chat-brand">
+          <div className="ai-brand-icon">
+            <Sparkles size={19} />
+          </div>
+          <div>
+            <strong>Findos KI</strong>
+            <small>Dein Assistent im Portal</small>
+          </div>
+        </div>
+        <div className="ai-toolbar-actions">
+          <button
+            className="ai-icon-button ai-expand"
+            onClick={() => setExpanded(!expanded)}
+            aria-label={expanded ? 'Chat verkleinern' : 'Chat vergrößern'}
+          >
+            {expanded ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+          </button>
+          <button
+            className="ai-icon-button"
+            onClick={() => setOpen(false)}
+            aria-label="KI-Chat schließen"
+          >
+            <X size={19} />
+          </button>
+        </div>
       </header>
       <ChatControls
         conversations={chat.conversations}
@@ -53,15 +84,40 @@ export default function AiChatSidebar() {
         onMore={() => void chat.loadMore().catch((e) => chat.setError((e as Error).message))}
       />
       <div className="ai-chat-context">
-        {context.view}
-        {context.entity ? ` · ${context.entity}` : ''}
+        <PanelRight size={13} />
+        <span>
+          {context.view}
+          {context.entity ? ' · ' + context.entity : ''}
+        </span>
       </div>
-      <div className="ai-chat-messages">
-        {!chat.messages.length && (
-          <p className="muted">
-            Frage zu deinen Daten oder beschreibe eine gewünschte Änderung. Nachrichten und
-            Dokumente werden in dieser Konversation gespeichert.
-          </p>
+      <div
+        className="ai-chat-messages"
+        ref={scroll}
+        onScroll={() => {
+          const el = scroll.current;
+          if (el) nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+        }}
+      >
+        {!chat.messages.length && !chat.busy && (
+          <div className="ai-welcome">
+            <div className="ai-welcome-icon">
+              <Sparkles size={27} />
+            </div>
+            <h2>Was möchtest du wissen?</h2>
+            <p>Entdecke deine Daten, verstehe Kennzahlen und entwickle neue KPI-Formeln.</p>
+            <div className="ai-starters">
+              {[
+                'Erkläre mir das Datenmodell',
+                'Hilf mir, eine KPI-Formel zu erstellen',
+                'Welche Kennzahlen stehen zur Verfügung?',
+              ].map((text) => (
+                <button key={text} onClick={() => chat.setDraft(text)}>
+                  {text}
+                  <ChevronLeft size={15} />
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         {chat.messages.map((message) => (
           <ChatMessageItem
@@ -72,9 +128,11 @@ export default function AiChatSidebar() {
           />
         ))}
         {chat.busy && (
-          <article className="ai-message assistant muted" role="status">
-            Wird verarbeitet …
-          </article>
+          <div className="ai-thinking" role="status">
+            <Sparkles size={16} />
+            <span>Wird verarbeitet</span>
+            <span className="ai-thinking-dots">•••</span>
+          </div>
         )}
       </div>
       {chat.error && (
@@ -82,53 +140,19 @@ export default function AiChatSidebar() {
           {chat.error}
         </div>
       )}
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
+      <ChatComposer
+        draft={chat.draft}
+        files={chat.files}
+        busy={chat.busy}
+        ready={!!chat.model}
+        onDraft={chat.setDraft}
+        onFiles={chat.setFiles}
+        onError={chat.setError}
+        onSend={() => {
+          nearBottom.current = true;
           void chat.send();
         }}
-      >
-        <textarea
-          disabled={chat.busy}
-          value={chat.draft}
-          onChange={(e) => chat.setDraft(e.target.value)}
-          maxLength={16000}
-          placeholder="Nachricht …"
-          rows={3}
-        />
-        <button
-          type="submit"
-          disabled={chat.busy || !chat.model || (!chat.draft.trim() && !chat.files.length)}
-        >
-          <Send size={16} /> Senden
-        </button>
-        <label className="ai-attachments">
-          Dokumente anhängen · max. 5 MB je Datei
-          <input
-            type="file"
-            disabled={chat.busy}
-            multiple
-            accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json"
-            onChange={(e) => {
-              const selected = Array.from(e.target.files || []);
-              if (selected.length > 10 || selected.some((f) => f.size > 5 * 1024 * 1024)) {
-                chat.setError('Maximal 10 Dateien mit jeweils bis zu 5 MB.');
-                e.target.value = '';
-                return;
-              }
-              chat.setFiles(selected);
-            }}
-          />
-        </label>
-        {!!chat.files.length && (
-          <small className="ai-attachments">
-            {chat.files.map((f) => f.name).join(', ')}{' '}
-            <button type="button" disabled={chat.busy} onClick={() => chat.setFiles([])}>
-              Entfernen
-            </button>
-          </small>
-        )}
-      </form>
+      />
     </aside>
   );
 }
