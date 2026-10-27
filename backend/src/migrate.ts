@@ -213,6 +213,39 @@ try {
     await client.query("INSERT INTO portal.schema_migrations(name) VALUES ('014-company-status')");
     console.log('Applied 014-company-status: Company status from Findos source.');
   }
+  if (!applied.has('015-performance-update-comments')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(
+        path.join(projectRoot, 'backend/migrations/015-performance-update-comments.sql'),
+        'utf8'
+      )
+    );
+    await client.query(
+      "INSERT INTO portal.schema_migrations(name) VALUES ('015-performance-update-comments')"
+    );
+    console.log('Applied 015-performance-update-comments.');
+  }
+  if (!applied.has('016-performance-comment-period-nullable')) {
+    await client.query(
+      await readFile(
+        path.join(projectRoot, 'backend/migrations/016-performance-comment-period-nullable.sql'),
+        'utf8'
+      )
+    );
+    await client.query(
+      "INSERT INTO portal.schema_migrations(name) VALUES ('016-performance-comment-period-nullable')"
+    );
+    console.log('Applied 016-performance-comment-period-nullable.');
+  }
+  if (!applied.has('017-metric-formulas')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(path.join(projectRoot, 'backend/migrations/017-metric-formulas.sql'), 'utf8')
+    );
+    await client.query("INSERT INTO portal.schema_migrations(name) VALUES ('017-metric-formulas')");
+    console.log('Applied 017-metric-formulas.');
+  }
   await client.query(process.argv.includes('--preview') ? 'ROLLBACK' : 'COMMIT');
   console.log(
     process.argv.includes('--preview')

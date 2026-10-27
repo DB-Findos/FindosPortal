@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   BriefcaseBusiness,
@@ -28,17 +28,22 @@ const icons: Record<string, typeof Folder> = {
 };
 export default function PortfolioSidebar() {
   const { request } = useApi();
+  const requestRef = useRef(request);
+  requestRef.current = request;
   const location = useLocation();
   const navigate = useNavigate();
   const [sections, setSections] = useState<Section[]>([]);
   const [companies, setCompanies] = useState<PortfolioCompany[]>([]);
   const [companiesLoaded, setCompaniesLoaded] = useState(false);
   const [companiesOpen, setCompaniesOpen] = useState(location.pathname === '/portfolio/company');
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () => window.matchMedia('(max-width: 1200px)').matches
+  );
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
-    request<Section[]>('/navigation')
+    requestRef
+      .current<Section[]>('/navigation')
       .then((value) => {
         if (active) setSections(value);
       })
@@ -48,12 +53,13 @@ export default function PortfolioSidebar() {
     return () => {
       active = false;
     };
-  }, [request]);
+  }, []);
   useEffect(() => {
     if (location.pathname === '/portfolio/company') {
       setCompaniesOpen(true);
       if (!companiesLoaded) {
-        request<PortfolioCompany[]>('/portfolio/companies')
+        requestRef
+          .current<PortfolioCompany[]>('/portfolio/companies')
           .then((value) => {
             setCompanies(value);
             setCompaniesLoaded(true);
@@ -61,7 +67,7 @@ export default function PortfolioSidebar() {
           .catch((e) => setError(e.message));
       }
     }
-  }, [location.pathname, companiesLoaded, request]);
+  }, [location.pathname, companiesLoaded]);
   const toggleCompanies = (view: View) => {
     if (collapsed) setCollapsed(false);
     if (location.pathname !== view.path) navigate(view.path);
@@ -155,10 +161,12 @@ export default function PortfolioSidebar() {
                                   `${view.path}?company=${encodeURIComponent(company.objectId)}&tab=performance-update`
                                 )
                               }
-                              title={company.name}
+                              title={company.internal_name || company.name}
                             >
                               <Building2 size={16} aria-hidden="true" />
-                              <span className="portfolio-company-name">{company.name}</span>
+                              <span className="portfolio-company-name">
+                                {company.internal_name || company.name}
+                              </span>
                             </button>
                           ))}
                         </div>

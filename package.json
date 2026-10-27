@@ -18,6 +18,8 @@
     "start": "npm run start -w backend",
     "setup:env": "tsx backend/src/setup-env.ts",
     "db:migrate": "npm run db:migrate -w backend",
+    "db:import-performance-update-comments": "tsx backend/src/import-performance-update-comments.ts --apply",
+    "db:import-metric-formulas": "tsx backend/src/import-metric-formulas.ts --apply",
     "db:seed": "npm run db:seed -w backend",
     "test:e2e": "tsx backend/src/e2e.ts",
     "format": "prettier --write \"frontend/src/**/*.{ts,tsx,css}\" \"backend/src/**/*.ts\"",

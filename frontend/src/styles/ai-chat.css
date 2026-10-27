@@ -12,6 +12,20 @@
   border: 1px solid var(--border);
   box-shadow: 0 4px 20px #13291c12;
 }
+@media (max-width: 700px) {
+  .ai-chat-toggle {
+    top: 10px;
+    right: 146px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    gap: 0;
+    font-size: 0;
+  }
+  .ai-chat-toggle svg:last-child {
+    display: none;
+  }
+}
 .ai-chat {
   position: fixed;
   z-index: 50;

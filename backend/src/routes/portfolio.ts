@@ -5,9 +5,31 @@ import { pool } from '../db.js';
 import { authenticate, permissions, requirePermission } from '../middleware/auth.js';
 import { current } from '../repositories/entities.js';
 import { httpError } from '../shared/errors.js';
+import { snapshot } from '../services/snapshot.js';
+import { incomeStatement } from '../services/metric-formula-engine.js';
+import { reportMonth } from '../services/report-context.js';
 
 export const portfolioRouter = Router();
 portfolioRouter.use(authenticate);
+
+portfolioRouter.get('/companies/:companyId/income-statement', async (req, res) => {
+  const rights = await permissions(req.userId!);
+  for (const entity of ['companies', 'metrics', 'metric_data', 'metric_formulas', 'index_rates'])
+    if (!rights[entity]?.can_read) throw httpError(403, 'Keine Berechtigung.');
+  const companyId = z.uuid().parse(req.params.companyId);
+  const dimension = z
+    .enum(['actual', 'budget', 'forecast', 'plan'])
+    .parse(req.query.dimension ?? 'actual');
+  const date = await reportMonth(companyId, req.query.date, dimension);
+  const context = {
+    companyId,
+    date,
+    currency: z.enum(['CC', 'EUR']).parse(req.query.currency ?? 'EUR'),
+    dimension,
+    aggregation: z.enum(['MONTH', 'YTD', 'LTM']).parse(req.query.aggregation ?? 'MONTH'),
+  };
+  res.json(await snapshot((db) => incomeStatement(db, context)));
+});
 
 portfolioRouter.get('/companies', async (req, res) => {
   await requirePermission(req.userId!, 'companies', 'read');
@@ -26,11 +48,8 @@ portfolioRouter.get('/companies/:companyId/performance-update', async (req, res)
     if (!rights[entity]?.can_read) throw httpError(403, 'Keine Berechtigung.');
 
   const companyId = z.uuid().parse(req.params.companyId);
-  const month = z
-    .string()
-    .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
-    .parse(req.query.date);
-  const currencyMode = z.enum(['CC', 'EUR']).parse(req.query.currency ?? 'CC');
+  const month = await reportMonth(companyId, req.query.date);
+  const currencyMode = z.enum(['CC', 'EUR']).parse(req.query.currency ?? 'EUR');
   const year = Number(month.slice(0, 4));
   const selectedMonth = `${month}-01`;
   const companyResult = await pool.query(
@@ -235,5 +254,145 @@ portfolioRouter.get('/companies/:companyId/performance-update', async (req, res)
     columns,
     rows,
     missingMetrics: names.filter((name) => !metrics.has(name)),
+  });
+});
+
+portfolioRouter.get('/companies/:companyId/performance-data', async (req, res) => {
+  const rights = await permissions(req.userId!);
+  for (const entity of ['companies', 'metrics', 'metric_data', 'performance_update_comments'])
+    if (!rights[entity]?.can_read) throw httpError(403, 'Keine Berechtigung.');
+
+  const companyId = z.uuid().parse(req.params.companyId);
+  const month = await reportMonth(companyId, req.query.date);
+  const selectedMonth = `${month}-01`;
+  const selected = new Date(`${selectedMonth}T00:00:00Z`);
+  const shiftMonth = (date: Date, amount: number) => {
+    const value = new Date(date);
+    value.setUTCMonth(value.getUTCMonth() + amount);
+    return value.toISOString().slice(0, 10);
+  };
+  const selectedQuarterMonth = Math.floor(selected.getUTCMonth() / 3) * 3;
+  const selectedQuarterStart = new Date(
+    Date.UTC(selected.getUTCFullYear(), selectedQuarterMonth, 1)
+  );
+  const quarters = Array.from({ length: 6 }, (_, index) => {
+    const start = shiftMonth(selectedQuarterStart, (index - 5) * 3);
+    const [year, monthNumber] = start.split('-').map(Number);
+    const quarterEndMonth = shiftMonth(new Date(`${start}T00:00:00Z`), 2);
+    const isSelectedQuarter = index === 5;
+    return {
+      start,
+      period: isSelectedQuarter ? selectedMonth : quarterEndMonth,
+      year,
+      label: `Q${Math.floor((monthNumber - 1) / 3) + 1}`,
+    };
+  });
+  const queryStart = quarters[0].start;
+  const queryEnd = shiftMonth(new Date(`${selectedMonth}T00:00:00Z`), 1);
+  const metricNumbers = [4101200, 4004100, 4004101, 4004200, 4004201, 1300300, 3200030];
+  const source = await pool.query(
+    `SELECT m.metric_number,m.name,d.dimension,to_char(d.period,'YYYY-MM-DD') AS period,d.value::text AS value
+     FROM portal.metrics m
+     LEFT JOIN portal.metric_data d ON d.metric_id=m."objectId" AND d."archivedAt" IS NULL
+       AND d.period >= $2::date AND d.period < $3::date
+     WHERE m.company_id=$1 AND m.metric_number=ANY($4::integer[]) AND m."archivedAt" IS NULL
+     ORDER BY m.metric_number,d.period,d.dimension`,
+    [companyId, queryStart, queryEnd, metricNumbers]
+  );
+  const metricMap = new Map<number, { name: string; values: Map<string, Map<string, Decimal>> }>();
+  for (const row of source.rows) {
+    const number = Number(row.metric_number);
+    const metric = metricMap.get(number) ?? { name: row.name, values: new Map() };
+    if (metric.name !== row.name)
+      throw httpError(422, `Metric Number ${number} ist f\u00fcr diese Company nicht eindeutig.`);
+    if (row.period && row.value !== null) {
+      const dimension = String(row.dimension);
+      const periods = metric.values.get(dimension) ?? new Map<string, Decimal>();
+      if (periods.has(row.period))
+        throw httpError(422, `Mehrere MetricData-Werte f\u00fcr Metric Number ${number}.`);
+      periods.set(row.period, new Decimal(row.value));
+      metric.values.set(dimension, periods);
+    }
+    metricMap.set(number, metric);
+  }
+  const direct = (number: number, date: string) =>
+    metricMap.get(number)?.values.get('actual')?.get(date) ?? null;
+  const sum = (number: number, start: string, end: string) => {
+    const values = metricMap.get(number)?.values.get('actual');
+    if (!values) return null;
+    const matching = [...values.entries()].filter(([date]) => date >= start && date <= end);
+    if (!matching.length) return null;
+    return matching.reduce((total, [, value]) => total.plus(value), new Decimal(0));
+  };
+  const asNumbers = (values: (Decimal | null)[]) =>
+    values.map((value) => value?.toNumber() ?? null);
+  const actuals = (number: number) => quarters.map((quarter) => direct(number, quarter.period));
+  const leverageName = metricMap.get(4004100)?.name ?? 'Leverage Ratio';
+  const otherCovenantName = metricMap.get(4004200)?.name ?? 'EBITDA/Net Interest';
+  const netInterestRatio = quarters.map((quarter) => {
+    const numerator = sum(1300300, quarter.start, quarter.period);
+    const denominator = sum(3200030, quarter.start, quarter.period);
+    return numerator && denominator && !denominator.isZero() ? numerator.div(denominator) : null;
+  });
+  const rows = [
+    { key: 'rcv', label: 'RCV', kind: 'value', values: asNumbers(actuals(4101200)) },
+    { key: 'leverage', label: leverageName, kind: 'value', values: asNumbers(actuals(4004100)) },
+    ...(metricMap.has(4004101)
+      ? [
+          {
+            key: 'leverage-target',
+            label: 'Target',
+            kind: 'target',
+            values: asNumbers(actuals(4004101)),
+          },
+        ]
+      : []),
+    {
+      key: 'interest-cover',
+      label: otherCovenantName,
+      kind: 'value',
+      values: asNumbers(netInterestRatio),
+    },
+    ...(metricMap.has(4004201)
+      ? [
+          {
+            key: 'interest-cover-target',
+            label: 'Target',
+            kind: 'target',
+            values: asNumbers(actuals(4004201)),
+          },
+        ]
+      : []),
+  ];
+  const comments = await pool.query(
+    `WITH eligible AS (
+       SELECT company_source_name,metric_data_period,performance_update_date,comment_text,text_type,
+         source_file,slide_number,paragraph_number,slide_id,source_row
+       FROM portal.performance_update_comments
+       WHERE company_id=$1 AND metric_data_period <= $2::date
+         AND performance_update_date IS NOT NULL
+         AND performance_update_date < $3::date
+         AND "archivedAt" IS NULL
+     ), chosen_period AS (
+       SELECT max(metric_data_period) AS period FROM eligible
+     ), chosen_term AS (
+       SELECT e.performance_update_date FROM eligible e JOIN chosen_period p ON e.metric_data_period=p.period
+       ORDER BY e.performance_update_date DESC NULLS LAST LIMIT 1
+     )
+     SELECT e.company_source_name,to_char(e.metric_data_period,'YYYY-MM-DD') AS metric_data_period,
+       to_char(e.performance_update_date,'YYYY-MM-DD') AS performance_update_date,
+       e.comment_text,e.text_type,e.source_file,e.slide_number,e.paragraph_number,e.slide_id
+     FROM eligible e JOIN chosen_period p ON e.metric_data_period=p.period
+     JOIN chosen_term t ON e.performance_update_date IS NOT DISTINCT FROM t.performance_update_date
+     ORDER BY e.source_row`,
+    [companyId, selectedMonth, shiftMonth(new Date(`${selectedMonth}T00:00:00Z`), 1)]
+  );
+  res.json({
+    date: month,
+    quarters,
+    rows,
+    comments: comments.rows,
+    commentPeriod: comments.rows[0]?.metric_data_period ?? null,
+    commentMeetingDate: comments.rows[0]?.performance_update_date ?? null,
   });
 });

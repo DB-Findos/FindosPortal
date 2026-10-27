@@ -91,6 +91,8 @@ dataRouter.use('/data/:entity', async (req, _res, next) => {
     throw httpError(403, 'Bitte den KPI-Editor bzw. die Berichtsverwaltung verwenden.');
   if (entity === 'entities' && action !== 'read')
     throw httpError(403, 'Systemkatalog ist schreibgeschützt.');
+  if (entity === 'metric_formulas' && action !== 'read')
+    throw httpError(403, 'Importierte Metric Formulas werden über den Import verwaltet.');
   next();
 });
 dataRouter.get('/data/:entity', async (req, res) => {

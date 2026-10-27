@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: 16px;
   min-height: 0;
+  height: max-content;
 }
 .performance-toolbar {
   display: flex;
@@ -136,7 +137,7 @@
 .performance-table thead tr:nth-child(2) th.is-actual {
   background: var(--primary);
   color: var(--on-primary);
-  border-top: 2px solid var(--accent);
+  border-top: 0;
 }
 .performance-table tr.is-margin th,
 .performance-table tr.is-margin td {
@@ -187,6 +188,144 @@
   color: var(--muted);
   font-size: 10px;
 }
+.performance-data-report {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-width: 0;
+  min-height: 0;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.performance-data-grid {
+  display: grid;
+  flex: none;
+  height: auto;
+  min-height: 0;
+  grid-template-columns: minmax(0, 0.35fr) minmax(0, 0.65fr);
+  gap: 14px;
+  align-items: stretch;
+}
+.performance-data-table-scroll,
+.performance-comments {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.performance-data-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.performance-data-table th,
+.performance-data-table td {
+  padding: 11px 9px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+  white-space: nowrap;
+}
+.performance-data-table thead th {
+  background: var(--tint);
+  color: var(--text);
+  font-weight: 650;
+  text-align: center;
+}
+.performance-data-table thead tr:nth-child(2) th {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.performance-data-table .performance-data-corner,
+.performance-data-table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 175px;
+  text-align: left;
+}
+.performance-data-table .performance-data-corner {
+  z-index: 2;
+  background: var(--tint);
+}
+.performance-data-table tbody th {
+  background: var(--surface);
+  font-weight: 600;
+}
+.performance-data-table tbody tr:nth-child(odd) td {
+  background: color-mix(in srgb, var(--surface) 94%, var(--background));
+}
+.performance-data-table .selected {
+  color: var(--primary);
+  background: var(--tint) !important;
+  font-weight: 700;
+}
+.performance-data-table thead tr:nth-child(2) .selected {
+  color: var(--on-primary);
+  background: var(--primary) !important;
+}
+.performance-data-table tr.is-target th,
+.performance-data-table tr.is-target td {
+  color: var(--secondary);
+  background: var(--background);
+  font-size: 11px;
+  font-weight: 450;
+}
+.performance-comments {
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+}
+.performance-comments-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+}
+.performance-comments-heading h3 {
+  margin: 5px 0 0;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.performance-comments-heading > svg {
+  flex: none;
+}
+.performance-comments-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.performance-comments-list ul {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding-left: 18px;
+}
+.performance-comments-list li {
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.performance-comments-list li::marker {
+  color: var(--accent);
+}
+.performance-comments-empty {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
 @keyframes performance-spin {
   to {
     transform: rotate(360deg);
@@ -199,5 +338,11 @@
   }
   .performance-pickers {
     justify-content: flex-start;
+  }
+  .performance-data-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .performance-comments {
+    max-height: 360px;
   }
 }

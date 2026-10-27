@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, RefreshCw } from 'lucide-react';
 import { useApi } from '../../contexts/ApiContext';
+import PerformanceDataReport from './PerformanceDataReport';
+import { useReportContext } from '../../hooks/useReportContext';
 import './PerformanceUpdateReport.css';
 
 type CurrencyMode = 'CC' | 'EUR';
@@ -14,11 +16,6 @@ type Report = {
   missingMetrics: string[];
 };
 
-function currentMonth() {
-  const today = new Date();
-  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-}
-
 function formatNumber(value: number | null, percent = false) {
   if (value === null || !Number.isFinite(value)) return '–';
   const absolute = new Intl.NumberFormat('de-DE', {
@@ -30,8 +27,7 @@ function formatNumber(value: number | null, percent = false) {
 
 export default function PerformanceUpdateReport({ companyId }: { companyId: string }) {
   const { request } = useApi();
-  const [date, setDate] = useState(currentMonth);
-  const [currency, setCurrency] = useState<CurrencyMode>('CC');
+  const { date, setDate, currency, setCurrency } = useReportContext(companyId);
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,9 +36,9 @@ export default function PerformanceUpdateReport({ companyId }: { companyId: stri
     let active = true;
     setLoading(true);
     setError('');
-    request<Report>(
-      `/portfolio/companies/${companyId}/performance-update?date=${date}&currency=${currency}`
-    )
+    const query = new URLSearchParams({ currency });
+    if (date) query.set('date', date);
+    request<Report>(`/portfolio/companies/${companyId}/performance-update?${query}`)
       .then((data) => {
         if (active) {
           setReport(data);
@@ -57,17 +53,20 @@ export default function PerformanceUpdateReport({ companyId }: { companyId: stri
 
   const currentReport =
     report?.company.objectId === companyId &&
-    report.date === date &&
+    (!date || report.date === date) &&
     report.currency.mode === currency
       ? report
       : null;
 
+  const effectiveDate = date || currentReport?.date || '';
   const monthTitle = useMemo(
     () =>
-      new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' }).format(
-        new Date(`${date}-01T00:00:00`)
-      ),
-    [date]
+      effectiveDate
+        ? new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' }).format(
+            new Date(`${effectiveDate}-01T00:00:00`)
+          )
+        : '',
+    [effectiveDate]
   );
   const groupHeaders = useMemo(() => {
     const groups: { label: string; span: number }[] = [];
@@ -85,14 +84,17 @@ export default function PerformanceUpdateReport({ companyId }: { companyId: stri
         <div className="performance-heading">
           <span className="performance-kicker">Company Reporting</span>
           <h2>Performance Update</h2>
-          <p>Monatliche Entwicklung, Jahresverlauf und Plan im gewählten Währungskontext.</p>
         </div>
         <div className="performance-pickers">
           <label>
             <span>Stichtag</span>
             <span className="performance-input-wrap">
               <CalendarDays size={15} />
-              <input type="month" value={date} onChange={(event) => setDate(event.target.value)} />
+              <input
+                type="month"
+                value={effectiveDate}
+                onChange={(event) => setDate(event.target.value)}
+              />
             </span>
           </label>
           <label>
@@ -138,7 +140,7 @@ export default function PerformanceUpdateReport({ companyId }: { companyId: stri
                   </th>
                   {groupHeaders.map((group, index) => (
                     <th key={`${group.label}-${index}`} colSpan={group.span}>
-                      {group.label === date ? monthTitle : group.label}
+                      {group.label === effectiveDate ? monthTitle : group.label}
                     </th>
                   ))}
                 </tr>
@@ -177,10 +179,7 @@ export default function PerformanceUpdateReport({ companyId }: { companyId: stri
               </tbody>
             </table>
           </div>
-          <div className="performance-footnote">
-            Währungsumrechnung auf Basis der IndexRates zum Stichtag {monthTitle}; Net Debt wird als
-            Monats-/Jahresendbestand dargestellt.
-          </div>
+          <PerformanceDataReport companyId={companyId} date={effectiveDate} />
         </>
       )}
     </section>

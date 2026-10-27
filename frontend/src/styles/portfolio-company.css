@@ -4,12 +4,26 @@
   min-height: 0;
   overflow: hidden;
 }
+.company-view-card .portfolio-view-eyebrow {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .company-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin: 7px 0 18px;
+}
+.company-title-row > div {
+  min-width: 0;
+}
+.company-title-row h1,
+.company-legal-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .company-title-row h1 {
   margin: 0;
@@ -35,6 +49,7 @@
   gap: 3px;
   min-height: 42px;
   overflow-x: auto;
+  overflow-y: hidden;
   border-bottom: 1px solid var(--border);
   scrollbar-width: thin;
 }
@@ -73,6 +88,29 @@
   overflow: auto;
   padding-top: 16px;
 }
+.company-tab-panel:has(> .income-statement) {
+  overflow: hidden;
+}
+@media (max-width: 1200px) {
+  .company-view-card {
+    padding: 18px;
+  }
+  .company-title-row {
+    margin-bottom: 12px;
+  }
+  .company-title-row h1 {
+    font-size: 21px;
+  }
+  .company-tabs button {
+    min-height: 44px;
+  }
+  .company-tabs {
+    min-height: 45px;
+  }
+  .company-tab-panel {
+    padding-top: 12px;
+  }
+}
 .company-tab-panel > .performance-update {
   width: 100%;
 }
@@ -105,5 +143,26 @@
   }
   .company-tabs button {
     padding-inline: 9px;
+  }
+}
+@media (min-width: 900px) and (max-height: 900px) {
+  .portfolio-main {
+    padding: 16px;
+  }
+  .company-view-card {
+    padding: 14px 18px;
+  }
+  .company-view-card .portfolio-view-eyebrow {
+    display: none;
+  }
+  .company-title-row {
+    margin: 0 0 8px;
+  }
+  .company-title-row h1 {
+    font-size: 19px;
+  }
+  .company-legal-name {
+    margin-top: 2px;
+    font-size: 10px;
   }
 }

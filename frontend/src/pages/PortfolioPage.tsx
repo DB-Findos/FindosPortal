@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import PortfolioSidebar from '../components/layout/PortfolioSidebar';
 import PerformanceUpdateReport from '../components/portfolio/PerformanceUpdateReport';
+import IncomeStatementReport from '../components/portfolio/IncomeStatementReport';
 import { useApi } from '../contexts/ApiContext';
 import '../styles/portfolio-company.css';
 
@@ -29,7 +30,8 @@ function CompanyView() {
   const { request } = useApi();
   const [params, setParams] = useSearchParams();
   const companyId = params.get('company');
-  const tab = params.get('tab') || 'performance-update';
+  const requestedTab = params.get('tab') || 'performance-update';
+  const tab = requestedTab === 'performance-data' ? 'performance-update' : requestedTab;
   const [companies, setCompanies] = useState<PortfolioCompany[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -87,6 +89,8 @@ function CompanyView() {
               <div className="company-tab-panel">
                 {tab === 'performance-update' ? (
                   <PerformanceUpdateReport companyId={company.objectId} />
+                ) : tab === 'income-statement' ? (
+                  <IncomeStatementReport companyId={company.objectId} />
                 ) : (
                   <div className="company-empty-report">
                     <span>{companyTabs.find(([key]) => key === tab)?.[1] || 'Report'}</span>
