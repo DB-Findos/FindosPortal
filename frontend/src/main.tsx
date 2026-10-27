@@ -9,6 +9,7 @@ import './styles/global.css';
 import './components/data/FieldSelector.css';
 import './styles/theme.css';
 import './styles/layout.css';
+import './styles/portfolio.css';
 import './styles/search.css';
 import './styles/ai-chat.css';
 createRoot(document.getElementById('root')!).render(

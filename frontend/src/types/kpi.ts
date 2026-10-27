@@ -33,23 +33,31 @@ export interface Report {
 }
 export interface KpiCatalog {
   metrics: { metric_number: number; name: string }[];
-  companies: { objectId: string; name: string }[];
+  companies: { objectId: string; name: string; currency?: string }[];
   sources: { entity: string; label: string; fields: string[]; filterFields: string[] }[];
 }
 export interface ReportContext {
   company_id: string;
   date: string;
   dimension: string;
+  currency?: 'CC' | 'EUR';
 }
 export interface KpiResult {
   objectId: string;
   name: string;
   unit: string;
   decimals: number;
+  currency_context: { mode: 'CC' | 'EUR'; code: string };
   value: string | null;
   status: 'ok' | 'missing' | 'error' | 'forbidden';
   message?: string;
-  variables: { identifier: string; name: string; value: string; period?: string }[];
+  variables: {
+    identifier: string;
+    name: string;
+    value: string;
+    period?: string;
+    currency?: string;
+  }[];
 }
 export interface ReportResult {
   report: { name: string };

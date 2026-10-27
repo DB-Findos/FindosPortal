@@ -24,6 +24,7 @@ export default function ReportContextFields({
           {companies.map((c) => (
             <option key={c.objectId} value={c.objectId}>
               {c.name}
+              {c.currency ? ` · CC: ${c.currency}` : ''}
             </option>
           ))}
         </select>
@@ -62,6 +63,17 @@ export default function ReportContextFields({
             <option key={d}>{d}</option>
           ))}
         </select>
+      </label>
+      <label>
+        Währungskontext
+        <select
+          value={value.currency || 'CC'}
+          onChange={(e) => onChange({ ...value, currency: e.target.value as 'CC' | 'EUR' })}
+        >
+          <option value="CC">CC · Company Currency</option>
+          <option value="EUR">EUR · Euro</option>
+        </select>
+        <small>CC nutzt die Währung der Company, ersatzweise die ihres Funds.</small>
       </label>
     </div>
   );

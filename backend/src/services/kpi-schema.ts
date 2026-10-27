@@ -54,8 +54,9 @@ export const reportContext = z
         'Ungültiger Berichtszeitraum.'
       ),
     dimension: z.enum(['actual', 'budget', 'forecast', 'plan']),
+    currency: z.enum(['CC', 'EUR']).default('CC'),
   })
   .strict();
 export type VariableInput = z.infer<typeof variableInput>;
 export type FormulaInput = z.infer<typeof formulaInput>;
-export type ReportContext = z.infer<typeof reportContext>;
+export type ReportContext = z.input<typeof reportContext>;

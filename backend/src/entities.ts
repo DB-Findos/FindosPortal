@@ -104,6 +104,12 @@ export const definitions = {
         .union([z.url(), z.literal('')])
         .nullable()
         .optional(),
+      currency: z
+        .string()
+        .regex(/^[A-Z]{3}$/)
+        .nullable()
+        .optional(),
+      status: optional,
     }),
     refs: { fund_id: 'funds' },
   },
@@ -226,6 +232,28 @@ export const definitions = {
       text_color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     }),
     refs: { logo_id: 'images' },
+  },
+  portfolio_sections: {
+    label: 'Portfolio Sections',
+    schema: z.object({ name: text, label: text, icon: text, position: z.number().int() }),
+    refs: {},
+  },
+  portfolio_views: {
+    label: 'Portfolio Views',
+    schema: z.object({
+      section_id: uuid,
+      name: text,
+      label: text,
+      path: text,
+      icon: text,
+      position: z.number().int(),
+    }),
+    refs: { section_id: 'portfolio_sections' },
+  },
+  portfolio_navigation_access: {
+    label: 'Portfolio Navigation Access',
+    schema: z.object({ group_id: uuid, view_id: uuid, can_read: z.boolean().default(false) }),
+    refs: { group_id: 'user_groups', view_id: 'portfolio_views' },
   },
 } as const;
 export type Entity = keyof typeof definitions;

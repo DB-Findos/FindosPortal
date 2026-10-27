@@ -440,6 +440,13 @@
   font-weight: 400;
   color: var(--secondary);
 }
+.kpi-card .kpi-currency-context {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+}
 .kpi-status {
   font-size: 12px;
   line-height: 1.6;

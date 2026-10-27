@@ -1,0 +1,109 @@
+.company-view-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.company-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 7px 0 18px;
+}
+.company-title-row h1 {
+  margin: 0;
+}
+.company-legal-name {
+  margin: 4px 0 0;
+  color: var(--secondary);
+  font-size: 11px;
+}
+.company-status-pill {
+  flex: none;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--primary);
+  background: var(--tint);
+  font-size: 10px;
+  font-weight: 650;
+}
+.company-tabs {
+  display: flex;
+  flex: none;
+  gap: 3px;
+  min-height: 42px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: thin;
+}
+.company-tabs button {
+  flex: none;
+  position: relative;
+  padding: 0 11px;
+  background: transparent;
+  color: var(--secondary);
+  font-size: 11px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+.company-tabs button:hover {
+  color: var(--text);
+  background: var(--background);
+}
+.company-tabs button.active {
+  color: var(--primary);
+  font-weight: 700;
+}
+.company-tabs button.active::after {
+  content: '';
+  position: absolute;
+  right: 9px;
+  bottom: -1px;
+  left: 9px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--primary);
+}
+.company-tab-panel {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-top: 16px;
+}
+.company-tab-panel > .performance-update {
+  width: 100%;
+}
+.company-empty-report {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  flex: 1;
+  min-height: 150px;
+  color: var(--secondary);
+  text-align: center;
+}
+.company-empty-report span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+}
+.company-empty-report p,
+.company-load-message,
+.company-load-error {
+  color: var(--secondary);
+  font-size: 11px;
+}
+.company-load-error {
+  color: #922f2f;
+}
+@media (max-width: 700px) {
+  .company-view-card {
+    padding: 18px;
+  }
+  .company-tabs button {
+    padding-inline: 9px;
+  }
+}

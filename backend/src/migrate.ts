@@ -184,6 +184,35 @@ try {
     await client.query("INSERT INTO portal.schema_migrations(name) VALUES ('011-chat-history')");
     console.log('Applied 011-chat-history: conversations, messages, documents and attachments.');
   }
+  if (!applied.has('012-portfolio-navigation')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(
+        path.join(projectRoot, 'backend/migrations/012-portfolio-navigation.sql'),
+        'utf8'
+      )
+    );
+    await client.query(
+      "INSERT INTO portal.schema_migrations(name) VALUES ('012-portfolio-navigation')"
+    );
+    console.log('Applied 012-portfolio-navigation: group-aware sections and views.');
+  }
+  if (!applied.has('013-company-currency')) {
+    await client.query(
+      await readFile(path.join(projectRoot, 'backend/migrations/013-company-currency.sql'), 'utf8')
+    );
+    await client.query(
+      "INSERT INTO portal.schema_migrations(name) VALUES ('013-company-currency')"
+    );
+    console.log('Applied 013-company-currency: explicit Company currency.');
+  }
+  if (!applied.has('014-company-status')) {
+    await client.query(
+      await readFile(path.join(projectRoot, 'backend/migrations/014-company-status.sql'), 'utf8')
+    );
+    await client.query("INSERT INTO portal.schema_migrations(name) VALUES ('014-company-status')");
+    console.log('Applied 014-company-status: Company status from Findos source.');
+  }
   await client.query(process.argv.includes('--preview') ? 'ROLLBACK' : 'COMMIT');
   console.log(
     process.argv.includes('--preview')

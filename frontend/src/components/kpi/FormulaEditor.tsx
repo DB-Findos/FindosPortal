@@ -46,6 +46,7 @@ export default function FormulaEditor({
     company_id: catalog.companies[0]?.objectId || '',
     date: new Date().toISOString().slice(0, 7) + '-01',
     dimension: 'actual',
+    currency: 'CC',
   });
   function change<K extends keyof FormulaDraft>(key: K, value: FormulaDraft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));

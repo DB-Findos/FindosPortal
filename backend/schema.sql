@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS portal.permissions (
  can_create boolean NOT NULL DEFAULT false, can_read boolean NOT NULL DEFAULT false, can_update boolean NOT NULL DEFAULT false, can_delete boolean NOT NULL DEFAULT false, UNIQUE(group_id,entity_id)
 );
 CREATE TABLE IF NOT EXISTS portal.funds (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name text NOT NULL UNIQUE, currency text NOT NULL DEFAULT 'EUR' CHECK(length(currency)=3), description text, created_at timestamptz NOT NULL DEFAULT now());
-CREATE TABLE IF NOT EXISTS portal.companies (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), fund_id uuid NOT NULL REFERENCES portal.funds(id) ON DELETE RESTRICT, name text NOT NULL, industry text, website text, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS portal.companies (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), fund_id uuid NOT NULL REFERENCES portal.funds(id) ON DELETE RESTRICT, name text NOT NULL, industry text, website text, currency text, created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS portal.metrics (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), company_id uuid NOT NULL REFERENCES portal.companies(id) ON DELETE RESTRICT, name text NOT NULL, unit text NOT NULL, description text, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(company_id,name));
 ALTER TABLE portal.companies ADD COLUMN IF NOT EXISTS internal_name text;
 ALTER TABLE portal.metrics ADD COLUMN IF NOT EXISTS metric_number integer CHECK(metric_number >= 0);

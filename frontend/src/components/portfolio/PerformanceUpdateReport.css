@@ -1,0 +1,203 @@
+.performance-update {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+.performance-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+}
+.performance-heading {
+  min-width: 0;
+}
+.performance-kicker {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.performance-heading h2 {
+  margin: 5px 0 3px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.performance-heading p {
+  margin: 0;
+  color: var(--secondary);
+  font-size: 11px;
+}
+.performance-pickers {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.performance-pickers label {
+  display: grid;
+  gap: 5px;
+  color: var(--secondary);
+  font-size: 11px;
+  font-weight: 550;
+}
+.performance-pickers select,
+.performance-pickers input {
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0 10px;
+  color: var(--text);
+  background: var(--surface);
+  font-size: 11px;
+}
+.performance-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+}
+.performance-input-wrap input {
+  border: 0;
+  padding-left: 0;
+}
+.performance-table-scroll {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.performance-table {
+  width: 100%;
+  min-width: 970px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  color: var(--text);
+  background: var(--surface);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.performance-table th,
+.performance-table td {
+  padding: 10px 9px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+  white-space: nowrap;
+}
+.performance-table thead th {
+  background: var(--tint);
+  color: var(--text);
+  font-weight: 600;
+  text-align: center;
+}
+.performance-table thead tr:first-child th {
+  height: 38px;
+}
+.performance-table thead tr:nth-child(2) th {
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 11px;
+}
+.performance-table .performance-corner {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  width: 170px;
+  text-align: left;
+}
+.performance-table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 170px;
+  background: var(--surface);
+  font-weight: 600;
+  text-align: left;
+}
+.performance-table tbody tr:nth-child(odd) td {
+  background: color-mix(in srgb, var(--surface) 94%, var(--background));
+}
+.performance-table td.is-actual,
+.performance-table thead th.is-actual {
+  background: var(--tint);
+  color: var(--primary);
+  font-weight: 650;
+  border-left: 2px solid var(--accent);
+  border-right: 2px solid var(--accent);
+}
+.performance-table thead tr:nth-child(2) th.is-actual {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-top: 2px solid var(--accent);
+}
+.performance-table tr.is-margin th,
+.performance-table tr.is-margin td {
+  background: var(--background);
+  color: var(--secondary);
+  font-weight: 450;
+}
+.performance-table tr.is-margin td.is-actual {
+  background: var(--tint);
+  color: var(--primary);
+  font-weight: 650;
+}
+.performance-table tr:last-child th,
+.performance-table tr:last-child td {
+  border-bottom: 0;
+}
+.performance-table th:last-child,
+.performance-table td:last-child {
+  border-right: 0;
+}
+.performance-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--secondary);
+  background: var(--background);
+  font-size: 11px;
+}
+.performance-message.error {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--surface);
+}
+.performance-refreshing {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.performance-spin {
+  animation: performance-spin 1s linear infinite;
+}
+.performance-footnote {
+  color: var(--muted);
+  font-size: 10px;
+}
+@keyframes performance-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 800px) {
+  .performance-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .performance-pickers {
+    justify-content: flex-start;
+  }
+}

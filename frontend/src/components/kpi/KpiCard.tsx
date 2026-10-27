@@ -15,6 +15,11 @@ export default function KpiCard({ result }: { result: KpiResult }) {
         {formatted}
         <small>{result.unit}</small>
       </div>
+      <small className="kpi-currency-context">
+        {result.currency_context.mode === 'CC'
+          ? `CC · ${result.currency_context.code}`
+          : 'EUR · Euro'}
+      </small>
       {result.message && (
         <p role="status" className="kpi-status">
           {result.message}
@@ -31,6 +36,7 @@ export default function KpiCard({ result }: { result: KpiResult }) {
                 </b>
                 <span>
                   {v.value}
+                  {v.currency ? ` ${v.currency}` : ''}
                   {v.period ? ' · ' + v.period : ''}
                 </span>
               </li>

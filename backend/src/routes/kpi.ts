@@ -48,7 +48,7 @@ kpiRouter.get('/catalog', async (req, res) => {
   const companies = rights.companies?.can_read
     ? (
         await pool.query(
-          `SELECT "objectId",name FROM portal.companies WHERE ${current} ORDER BY name`
+          `SELECT c."objectId",c.name,coalesce(c.currency,f.currency) AS currency FROM portal.companies c JOIN portal.funds f ON f."objectId"=c.fund_id AND f."archivedAt" IS NULL WHERE c."archivedAt" IS NULL ORDER BY c.name`
         )
       ).rows
     : [];

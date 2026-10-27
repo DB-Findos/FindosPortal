@@ -17,6 +17,7 @@ export default function HomePage() {
       company_id: '',
       date: new Date().toISOString().slice(0, 7) + '-01',
       dimension: 'actual',
+      currency: 'CC',
     }),
     [result, setResult] = useState<ReportResult | null>(null),
     [busy, setBusy] = useState(false);
@@ -130,7 +131,10 @@ export default function HomePage() {
                 <h2>{result.report.name}</h2>
                 <p>
                   {result.company.name} · {result.context.date.slice(0, 7)} ·{' '}
-                  {result.context.dimension}
+                  {result.context.dimension} Â·{' '}
+                  {result.context.currency === 'EUR'
+                    ? 'EUR · Euro'
+                    : `CC · ${result.results[0]?.currency_context.code || 'Company Currency'}`}
                 </p>
               </div>
               <div className="kpi-grid">
