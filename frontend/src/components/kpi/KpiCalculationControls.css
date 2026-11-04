@@ -1,0 +1,46 @@
+.kpi-calculation-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 0;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.kpi-calculation-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.kpi-calculation-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.kpi-calculation-status {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+.kpi-calculation-status progress {
+  width: min(280px, 100%);
+  height: 6px;
+  accent-color: var(--primary);
+}
+.kpi-calculation-spin {
+  animation: kpi-calculation-spin 1.2s linear infinite;
+}
+@keyframes kpi-calculation-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kpi-calculation-spin {
+    animation: none;
+  }
+}

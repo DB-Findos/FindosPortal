@@ -1,0 +1,109 @@
+.bridge-waterfall-content,
+.bridge-history-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.bridge-readout,
+.bridge-series-readout {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 14px;
+  min-height: 26px;
+  padding: 6px 16px 3px;
+  color: var(--secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.bridge-readout strong,
+.bridge-series-readout strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.bridge-series-readout > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.bridge-hit-area {
+  fill: transparent;
+  stroke: none;
+}
+.bridge-column,
+.bridge-month {
+  cursor: pointer;
+  touch-action: pan-y;
+}
+.bridge-column:focus-visible,
+.bridge-month:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.bridge-column[aria-pressed='true'] .income-label {
+  fill: var(--text);
+  font-weight: 700;
+}
+.bridge-effects-card h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.bridge-effect-selector {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 14px 0;
+}
+.bridge-effect-selector button {
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--secondary);
+  font-size: 11px;
+}
+.bridge-effect-selector button.is-selected {
+  color: var(--primary);
+  background: var(--tint);
+  border-color: var(--primary);
+}
+.bridge-effect-selector i,
+.bridge-series-readout i {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.bridge-charts {
+  grid-template-rows: minmax(240px, 1.05fr) minmax(270px, 1fr);
+}
+@media (pointer: coarse) {
+  .bridge-effect-selector button {
+    min-height: 44px;
+  }
+}
+@media (max-width: 700px) {
+  .bridge-readout,
+  .bridge-series-readout {
+    padding-inline: 10px;
+    font-size: 10px;
+    gap: 4px 8px;
+  }
+  .bridge-waterfall .income-label {
+    font-size: 9px;
+  }
+  .bridge-effect-selector {
+    padding-inline: 10px;
+  }
+  .bridge-charts {
+    grid-template-rows: minmax(240px, 1fr) minmax(310px, 1fr);
+  }
+}

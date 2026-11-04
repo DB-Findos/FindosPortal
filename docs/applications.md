@@ -1,0 +1,11 @@
+# Application launcher
+
+After login, `/` shows two prominent portal areas: Knowledge Management (`/knowledge`) and Portfolio Management (`/portfolio/dashboard`, the existing reporting application). A separate Reporting tile no longer exists. Existing portfolio URLs, company selections and group visibility rules continue to work. Topbar, settings and AI chat remain shared. The topbar's application grid button and logo return to the launcher.
+
+The second row contains compact application links: People Management, Datev, Adobe Sign, Lanes & Planes, Teams, DealCloud (the existing CRM module), and Dynamo. Below a divider, Entity Management, Deal Management, Fund Management and Financing Tools appear as unlinked cards without a planned/unavailable label. If one of these receives an external link, it moves into the application links area.
+
+`Settings → Anwendungen & Links` configures HTTP/HTTPS destinations. External links open in a new tab with noopener/noreferrer. The two integrated portal areas have fixed internal destinations and their external URL inputs are disabled. No external URLs are guessed or prefilled. Existing configured destinations are retained.
+
+Migration 022 registers the versioned `application_modules` Entity and seeds the eight modules. Authenticated users can load `GET /api/applications`; only users with application_modules update permission (initially Administrators) can `PUT /api/applications/links`. Link changes use version IDs and one audited transaction; validation/conflict errors are returned on the corresponding input field. Generic Data Management/MCP writes are blocked to preserve the fixed module catalog.
+
+The original Portfolio Reporting navigation section retains all view/group references. To apply the updated module catalog after building the backend, run `node backend/dist/seed-application-launcher.js`. It saves a local backup under `.imports/applications`, updates the catalog in one audited transaction, retains stable module IDs and existing external links, and archives the previous Reporting tile. It can be rerun without adding duplicate modules. No new environment variables are required. Deploy backend/frontend to publish the layout.

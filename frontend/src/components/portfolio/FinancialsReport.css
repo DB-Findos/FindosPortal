@@ -1,0 +1,107 @@
+.financials-report {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.company-tab-panel:has(> .financials-report) {
+  overflow: hidden;
+}
+.financials-pickers {
+  width: 100%;
+}
+.balance-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  flex: none;
+}
+.balance-kpis button {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+.balance-segment:focus:not(:focus-visible),
+.balance-kpis button:focus:not(:focus-visible) {
+  outline: none;
+}
+.balance-kpis span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.balance-kpis strong {
+  font-size: clamp(15px, 2vw, 24px);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.balance-kpis small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.balance-visual {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  padding-top: 8px;
+}
+.balance-direct-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 11px;
+  line-height: 18px;
+}
+.balance-direct-label.selected {
+  color: var(--primary);
+  font-weight: 700;
+}
+.balance-label-connector {
+  stroke-width: 1;
+  opacity: 0.65;
+  pointer-events: none;
+}
+.balance-segment {
+  cursor: pointer;
+}
+.balance-segment:focus-visible {
+  outline: 2px solid var(--primary);
+}
+.balance-segment-value {
+  fill: var(--surface);
+  font-size: 11px;
+  pointer-events: none;
+  font-weight: 600;
+}
+.income-chart-meta h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .balance-kpis {
+    gap: 6px;
+  }
+  .balance-kpis button {
+    padding: 10px 8px;
+  }
+  .balance-kpis span {
+    font-size: 10px;
+  }
+  .balance-direct-label {
+    font-size: 10px;
+  }
+}

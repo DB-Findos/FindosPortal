@@ -1,0 +1,332 @@
+.fund-report-panel,
+.fund-bridge-content,
+.fund-data-status {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  gap: 12px;
+}
+.fund-report-panel {
+  padding-top: 14px;
+}
+.fund-report-toolbar {
+  flex: none;
+  flex-wrap: wrap;
+}
+.fund-report-toolbar .performance-pickers {
+  flex-wrap: wrap;
+}
+.fund-currency-context {
+  align-self: flex-end;
+  padding: 11px 12px;
+  font-size: 12px;
+  color: var(--primary);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--background);
+}
+.fund-bridge-chart {
+  flex: 1;
+  min-height: 230px;
+}
+.fund-bridge-content {
+  overflow-y: auto;
+}
+.fund-bridge-breakdown {
+  flex: none;
+  max-height: 210px;
+  overflow: auto;
+}
+.fund-bridge-breakdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.fund-bridge-breakdown td,
+.fund-bridge-breakdown th {
+  padding: 9px 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+.fund-bridge-breakdown th:first-child {
+  text-align: left;
+}
+.fund-bridge-breakdown tfoot {
+  font-weight: 650;
+}
+.fund-bridge-breakdown small {
+  display: block;
+  color: var(--secondary);
+  font-weight: 400;
+  font-size: 10px;
+}
+.fund-status-top,
+.fund-detail-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: none;
+}
+.fund-status-top h3,
+.fund-detail-toolbar h3 {
+  margin: 0;
+  font-size: 13px;
+  flex: 1;
+}
+.fund-status-top label {
+  font-size: 11px;
+  color: var(--secondary);
+}
+.fund-data-status select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11px;
+}
+.fund-status-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  flex: none;
+}
+.fund-status-summary > div {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.fund-status-summary strong {
+  font-size: 19px;
+}
+.fund-status-summary span {
+  font-size: 11px;
+  color: var(--secondary);
+}
+.fund-status-dot {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.fund-status-dot.green {
+  background: #32815b;
+}
+.fund-status-dot.yellow {
+  background: #d49b1c;
+}
+.fund-status-dot.red {
+  background: #c34c4c;
+}
+.fund-table-scroll {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.fund-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.fund-table th,
+.fund-table td {
+  padding: 8px 10px;
+  white-space: nowrap;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.fund-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--background);
+  color: var(--secondary);
+  font-size: 10px;
+}
+.fund-table th:first-child,
+.fund-table td:first-child {
+  text-align: left;
+}
+.fund-table .pinned-column {
+  z-index: 1;
+}
+.fund-table th.pinned-column {
+  z-index: 4;
+}
+.fund-table th svg {
+  vertical-align: middle;
+  margin-left: 3px;
+}
+.fund-table th button {
+  font: inherit;
+  background: transparent;
+  color: inherit;
+  padding: 3px;
+}
+.fund-table th button.fund-selected-month {
+  color: var(--primary);
+  font-weight: 700;
+}
+.fund-company-drilldown {
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 550;
+}
+.fund-company-drilldown:hover {
+  color: var(--primary);
+}
+.fund-status-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  min-height: 30px;
+  width: 100%;
+  border-radius: 5px;
+}
+.fund-status-cell.green,
+.fund-data-value.green {
+  background: #32815b12;
+}
+.fund-status-cell.yellow,
+.fund-data-value.yellow {
+  background: #d49b1c18;
+}
+.fund-status-cell.red,
+.fund-data-value.red {
+  background: #c34c4c15;
+}
+.fund-data-value {
+  display: block;
+  padding: 5px 7px;
+  border-radius: 4px;
+  min-width: 65px;
+}
+.fund-data-value.red {
+  color: #b43e3e;
+}
+.fund-data-value.yellow {
+  color: #946c15;
+}
+.fund-status-note {
+  flex: none;
+  margin: 0;
+  color: var(--secondary);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.fund-report-warnings {
+  flex: none;
+  max-height: 145px;
+  overflow: auto;
+  font-size: 11px;
+  color: var(--secondary);
+}
+.fund-report-warnings p {
+  margin: 8px 0;
+  line-height: 1.5;
+}
+.fund-report-warnings small {
+  display: block;
+  font-size: 10px;
+}
+.fund-report-warnings label {
+  display: block;
+  margin-top: 8px;
+}
+.fund-detail-back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--background);
+  color: var(--primary);
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.fund-detail-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  padding: 7px;
+  border-radius: 6px;
+  color: var(--secondary);
+}
+.fund-detail-search input {
+  border: 0;
+  outline: 0;
+  min-width: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+}
+.fund-detail-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--secondary);
+}
+.fund-source-badge {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: var(--tint);
+  color: var(--primary);
+  font-size: 9px;
+}
+@media (max-width: 750px) {
+  .fund-status-summary > div {
+    padding: 8px;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .fund-status-summary span {
+    font-size: 10px;
+  }
+  .fund-report-toolbar .performance-pickers {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+  .fund-report-toolbar label,
+  .fund-report-toolbar input,
+  .fund-report-toolbar select {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+  .fund-detail-toolbar h3 {
+    flex-basis: 70%;
+  }
+  .fund-status-note {
+    font-size: 9px;
+  }
+  .fund-table td {
+    padding: 6px;
+  }
+  .fund-detail-search {
+    max-width: 100%;
+  }
+}
