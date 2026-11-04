@@ -3,6 +3,8 @@ import { definitions, entityName, fields, type Entity } from '../entities.js';
 import { auditColumns } from '../repositories/entities.js';
 import { httpError } from '../shared/errors.js';
 import { privateChatEntities } from './chat-schema.js';
+import { privateCustomReportEntities } from './custom-reports/access.js';
+import { sharedDocumentScope, documentLinkSql } from './document-schema.js';
 
 const alias = z.string().regex(/^[a-z][a-z0-9_]{0,30}$/);
 const field = z.object({ alias, field: z.string().min(1).max(100) }).strict();
@@ -46,11 +48,20 @@ export function searchFields(entity: Entity) {
     (f) => !['password', 'password_hash', 'data_base64', 'definition'].includes(f)
   );
 }
-export function compileSearch(input: unknown, rights: Record<string, { can_read?: boolean }>) {
+export function compileSearch(
+  input: unknown,
+  rights: Record<string, { can_read?: boolean }>,
+  options: { rootRows?: boolean; includeRecordRefs?: boolean } = {}
+) {
   const definition = searchDefinition.parse(input);
   const aliases = new Map<string, { entity: Entity; sql: string }>();
   const authorize = (entity: Entity) => {
-    if (entity === 'search_views' || privateChatEntities.has(entity) || !rights[entity]?.can_read)
+    if (
+      entity === 'search_views' ||
+      privateChatEntities.has(entity) ||
+      privateCustomReportEntities.has(entity) ||
+      !rights[entity]?.can_read
+    )
       throw httpError(403, 'Keine Leseberechtigung für ' + entity);
   };
   const root = entityName(definition.entity);
@@ -67,16 +78,27 @@ export function compileSearch(input: unknown, rights: Record<string, { can_read?
     authorize(target);
     const sql = 't' + (index + 1);
     aliases.set(join.alias, { entity: target, sql });
-    from += ` ${join.type === 'inner' ? 'INNER' : 'LEFT'} JOIN portal.${target} ${sql} ON ${parent.sql}."${join.field}"=${sql}."objectId" AND ${sql}."archivedAt" IS NULL`;
+    from += ` ${join.type === 'inner' ? 'INNER' : 'LEFT'} JOIN portal.${target} ${sql} ON ${parent.sql}."${join.field}"=${sql}."objectId" AND ${sql}."archivedAt" IS NULL AND ${sharedDocumentScope(target, sql)}`;
   }
   const resolve = (item: { alias: string; field: string }) => {
     const source = aliases.get(item.alias);
     if (!source || !searchFields(source.entity).includes(item.field))
       throw httpError(400, 'Unbekanntes oder gesperrtes Feld: ' + item.alias + '.' + item.field);
+    if (item.field === 'url' && ['documents', 'knowledge_documents'].includes(source.entity))
+      return `(${documentLinkSql(source.entity, source.sql)})`;
     return `${source.sql}."${item.field}"`;
   };
   const values: unknown[] = [];
-  const where = ['t0."archivedAt" IS NULL'];
+  const where = ['t0."archivedAt" IS NULL', sharedDocumentScope(root, 't0')];
+  for (const source of aliases.values())
+    if (source.entity === 'kpi_data') {
+      values.push(
+        Object.entries(rights)
+          .filter(([, permission]) => permission.can_read)
+          .map(([name]) => name)
+      );
+      where.push(`${source.sql}.required_entities <@ $${values.length}::text[]`);
+    }
   for (const filter of definition.filters) {
     const column = resolve(filter);
     if (filter.op === 'isnull' || filter.op === 'notnull') {
@@ -115,7 +137,21 @@ export function compileSearch(input: unknown, rights: Record<string, { can_read?
   const keys = definition.fields.map((f) => f.alias + '.' + f.field);
   if (new Set(keys).size !== keys.length)
     throw httpError(400, 'Ein Feld kann nur einmal ausgewählt werden.');
-  const select = definition.fields.map((f, i) => `${resolve(f)} AS "${keys[i]}"`).join(',');
+  for (const selected of definition.fields) resolve(selected);
+  let select = options.rootRows
+    ? 't0.*'
+    : definition.fields.map((f) => `${resolve(f)} AS "${f.alias}.${f.field}"`).join(',');
+  // Identity metadata is independent of selected display columns. All aliases
+  // have already passed the entity permission and reference validation above.
+  if (options.includeRecordRefs && !options.rootRows) {
+    const records = [...aliases.entries()]
+      .map(
+        ([name, source]) =>
+          `'${name}',CASE WHEN ${source.sql}.id IS NULL THEN NULL ELSE jsonb_build_object('entity','${source.entity}','objectId',${source.sql}."objectId",'id',${source.sql}.id) END`
+      )
+      .join(',');
+    select += `,jsonb_build_object(${records}) AS "__record_refs"`;
+  }
   const order = definition.order.map(
     (f) => `${resolve(f)} ${f.direction === 'asc' ? 'ASC' : 'DESC'} NULLS LAST`
   );
@@ -124,6 +160,14 @@ export function compileSearch(input: unknown, rights: Record<string, { can_read?
     definition,
     values,
     columns: keys,
+    sourceSql: `SELECT ${select} FROM ${from} WHERE ${where.join(' AND ')}`,
+    fieldTypes: Object.fromEntries(
+      definition.fields.map((item) => [
+        item.alias + '.' + item.field,
+        fields(aliases.get(item.alias)!.entity).find((candidate) => candidate.name === item.field)
+          ?.type || 'text',
+      ])
+    ),
     sql: `SELECT ${select} FROM ${from} WHERE ${where.join(' AND ')} ORDER BY ${order.join(',')} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
     countSql: `SELECT count(*)::int AS total FROM ${from} WHERE ${where.join(' AND ')}`,
   };

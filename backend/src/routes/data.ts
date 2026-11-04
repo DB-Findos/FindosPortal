@@ -16,6 +16,14 @@ import {
 } from '../repositories/entities.js';
 import { httpError, fieldError } from '../shared/errors.js';
 import { privateChatEntities } from '../services/chat-schema.js';
+import { privateCustomReportEntities } from '../services/custom-reports/access.js';
+import { knowledgeEntities } from '../services/knowledge/schema.js';
+import { sharedDocumentScope } from '../services/document-schema.js';
+import { refreshKnowledgeReviews } from '../services/knowledge/reviews.js';
+const readableSources = (rights: Record<string, { can_read?: boolean }>) =>
+  Object.entries(rights)
+    .filter(([, right]) => right.can_read)
+    .map(([name]) => name);
 export const dataRouter = Router();
 dataRouter.use(authenticate);
 dataRouter.get('/entities', async (req, res) => {
@@ -24,7 +32,11 @@ dataRouter.get('/entities', async (req, res) => {
     Object.entries(definitions)
       .filter(
         ([name]) =>
-          name !== 'search_views' && !privateChatEntities.has(name) && rights[name]?.can_read
+          name !== 'search_views' &&
+          name !== 'knowledge_documents' &&
+          !privateChatEntities.has(name) &&
+          !privateCustomReportEntities.has(name) &&
+          rights[name]?.can_read
       )
       .map(([name, def]) => ({
         name,
@@ -80,10 +92,15 @@ dataRouter.use('/data/:entity', async (req, _res, next) => {
       { GET: 'read', POST: 'create', PATCH: 'update', DELETE: 'delete' } as Record<string, string>
     )[req.method];
   await requirePermission(req.userId!, entity, action || 'invalid');
+  if (entity === 'knowledge_entries' && action === 'read') await refreshKnowledgeReviews();
   if (privateChatEntities.has(entity))
     throw httpError(403, 'Private Chats nur über die Chat-Funktionen abrufen.');
+  if (privateCustomReportEntities.has(entity))
+    throw httpError(403, 'Custom Reports über die spezialisierte Berichtsansicht verwalten.');
   if (entity === 'search_views')
     throw httpError(403, 'Views werden über die Advanced Search verwaltet.');
+  if (knowledgeEntities.has(entity) && action !== 'read')
+    throw httpError(403, 'Knowledge-Einträge über den Knowledge-Bereich bearbeiten.');
   if (
     ['kpi_formulas', 'variable_map', 'report_definitions', 'report_items'].includes(entity) &&
     action !== 'read'
@@ -91,6 +108,13 @@ dataRouter.use('/data/:entity', async (req, _res, next) => {
     throw httpError(403, 'Bitte den KPI-Editor bzw. die Berichtsverwaltung verwenden.');
   if (entity === 'entities' && action !== 'read')
     throw httpError(403, 'Systemkatalog ist schreibgeschützt.');
+  if (entity === 'kpi_data' && action !== 'read')
+    throw httpError(
+      403,
+      'KPIData wird ausschließlich durch Recalculate bzw. die Berechnungsengine erstellt.'
+    );
+  if (entity === 'application_modules' && action !== 'read')
+    throw httpError(403, 'Anwendungslinks bitte in den Einstellungen verwalten.');
   if (entity === 'metric_formulas' && action !== 'read')
     throw httpError(403, 'Importierte Metric Formulas werden über den Import verwaltet.');
   next();
@@ -99,28 +123,53 @@ dataRouter.get('/data/:entity', async (req, res) => {
   const entity = entityName(req.params.entity),
     page = z.coerce.number().int().min(1).max(100000).catch(1).parse(req.query.page),
     limit = z.coerce.number().int().min(1).max(100).catch(50).parse(req.query.limit);
+  const kpiSources = entity === 'kpi_data' ? readableSources(await permissions(req.userId!)) : [];
   const rows = (
     await pool.query(
-      `SELECT * FROM portal.${entity} WHERE ${current} ORDER BY "objectId" LIMIT $1 OFFSET $2`,
-      [limit, (page - 1) * limit]
+      `SELECT * FROM portal.${entity} WHERE ${current} AND ${sharedDocumentScope(entity)}${entity === 'kpi_data' ? ' AND required_entities <@ $3::text[]' : ''} ORDER BY "objectId" LIMIT $1 OFFSET $2`,
+      [limit, (page - 1) * limit, ...(entity === 'kpi_data' ? [kpiSources] : [])]
     )
   ).rows;
   res.json({
     rows: rows.map((row) => publicRow(entity, row)),
     total: (
-      await pool.query(`SELECT count(*)::int AS total FROM portal.${entity} WHERE ${current}`)
+      await pool.query(
+        `SELECT count(*)::int AS total FROM portal.${entity} WHERE ${current} AND ${sharedDocumentScope(entity)}${entity === 'kpi_data' ? ' AND required_entities <@ $1::text[]' : ''}`,
+        entity === 'kpi_data' ? [kpiSources] : []
+      )
     ).rows[0].total,
     page,
     limit,
   });
 });
+dataRouter.get('/data/:entity/:objectId', async (req, res) => {
+  const entity = entityName(req.params.entity);
+  const objectId = z.uuid().parse(req.params.objectId);
+  const row = (
+    await pool.query(
+      `SELECT * FROM portal.${entity} WHERE "objectId"=$1 AND ${current} AND ${sharedDocumentScope(entity)}`,
+      [objectId]
+    )
+  ).rows[0];
+  if (!row) throw httpError(404, 'Objekt nicht gefunden oder bereits archiviert.');
+  if (entity === 'kpi_data') {
+    const allowed = new Set(readableSources(await permissions(req.userId!)));
+    if (!row.required_entities.every((name: string) => allowed.has(name)))
+      throw httpError(403, 'Keine Berechtigung für die KPI-Quellen.');
+  }
+  res.json(publicRow(entity, row));
+});
+
 dataRouter.get('/data/:entity/:objectId/history', async (req, res) => {
   const entity = entityName(req.params.entity),
     objectId = z.uuid().parse(req.params.objectId);
   const rows = (
     await pool.query(
-      `SELECT * FROM portal.${entity} WHERE "objectId"=$1 ORDER BY "lastModifiedAt" DESC,id`,
-      [objectId]
+      `SELECT * FROM portal.${entity} WHERE "objectId"=$1 AND ${sharedDocumentScope(entity)}${entity === 'kpi_data' ? ' AND required_entities <@ $2::text[]' : ''} ORDER BY "lastModifiedAt" DESC,id`,
+      [
+        objectId,
+        ...(entity === 'kpi_data' ? [readableSources(await permissions(req.userId!))] : []),
+      ]
     )
   ).rows;
   res.json({ rows: rows.map((row) => publicRow(entity, row)) });

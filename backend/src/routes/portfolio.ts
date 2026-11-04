@@ -6,11 +6,88 @@ import { authenticate, permissions, requirePermission } from '../middleware/auth
 import { current } from '../repositories/entities.js';
 import { httpError } from '../shared/errors.js';
 import { snapshot } from '../services/snapshot.js';
-import { incomeStatement } from '../services/metric-formula-engine.js';
+import { incomeStatement, balanceSheet } from '../services/metric-formula-engine.js';
 import { reportMonth } from '../services/report-context.js';
+import { bridgeReport } from '../services/bridge-report.js';
+import { investorReport } from '../services/investor-report.js';
 
 export const portfolioRouter = Router();
 portfolioRouter.use(authenticate);
+
+portfolioRouter.get('/companies/:companyId/details', async (req, res) => {
+  const rights = await permissions(req.userId!);
+  if (!rights.companies?.can_read) throw httpError(403, 'Keine Berechtigung.');
+  const companyId = z.uuid().parse(req.params.companyId);
+  res.json(
+    await snapshot(async (db) => {
+      const company = (
+        await db.query(`SELECT * FROM portal.companies WHERE "objectId"=$1 AND ${current}`, [
+          companyId,
+        ])
+      ).rows[0];
+      if (!company) throw httpError(404, 'Unternehmen nicht gefunden.');
+      const fund = rights.funds?.can_read
+        ? ((
+            await db.query(
+              `SELECT "objectId",name FROM portal.funds WHERE "objectId"=$1 AND ${current}`,
+              [company.fund_id]
+            )
+          ).rows[0] ?? null)
+        : null;
+      const contacts =
+        rights.company_contacts?.can_read && rights.contacts?.can_read
+          ? (
+              await db.query(
+                `SELECT to_jsonb(a) AS assignment, to_jsonb(c) AS contact
+          FROM portal.company_contacts a
+          LEFT JOIN portal.contacts c ON c."objectId"=a.contact_id AND c."archivedAt" IS NULL
+          WHERE a.company_id=$1 AND a."archivedAt" IS NULL
+          ORDER BY c.last_name,c.first_name,a.role`,
+                [companyId]
+              )
+            ).rows
+          : null;
+      return { company, fund, contacts };
+    })
+  );
+});
+
+portfolioRouter.get('/companies/:companyId/investor-reporting', async (req, res) => {
+  const rights = await permissions(req.userId!);
+  for (const entity of ['companies', 'metrics', 'metric_data', 'comments'])
+    if (!rights[entity]?.can_read) throw httpError(403, 'Keine Berechtigung.');
+  const companyId = z.uuid().parse(req.params.companyId);
+  const date = z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+    .optional()
+    .parse(req.query.date);
+  res.json(await snapshot((db) => investorReport(db, companyId, date)));
+});
+
+portfolioRouter.get('/companies/:companyId/bridge', async (req, res) => {
+  const rights = await permissions(req.userId!);
+  for (const entity of [
+    'companies',
+    'metrics',
+    'metric_data',
+    'index_rates',
+    'kpi_formulas',
+    'variable_map',
+    'report_definitions',
+    'report_items',
+  ])
+    if (!rights[entity]?.can_read) throw httpError(403, 'Keine Berechtigung.');
+  const companyId = z.uuid().parse(req.params.companyId);
+  const dimension = z
+    .enum(['actual', 'budget', 'forecast', 'plan'])
+    .parse(req.query.dimension ?? 'actual');
+  const date = await reportMonth(companyId, req.query.date, dimension);
+  const currency = z.enum(['CC', 'EUR']).parse(req.query.currency ?? 'EUR');
+  res.json(
+    await snapshot((db) => bridgeReport(db, rights, { companyId, dimension, date, currency }))
+  );
+});
 
 portfolioRouter.get('/companies/:companyId/income-statement', async (req, res) => {
   const rights = await permissions(req.userId!);
@@ -29,6 +106,23 @@ portfolioRouter.get('/companies/:companyId/income-statement', async (req, res) =
     aggregation: z.enum(['MONTH', 'YTD', 'LTM']).parse(req.query.aggregation ?? 'MONTH'),
   };
   res.json(await snapshot((db) => incomeStatement(db, context)));
+});
+
+portfolioRouter.get('/companies/:companyId/balance-sheet', async (req, res) => {
+  const rights = await permissions(req.userId!);
+  for (const entity of ['companies', 'metrics', 'metric_data', 'metric_formulas', 'index_rates'])
+    if (!rights[entity]?.can_read) throw httpError(403, 'Keine Berechtigung.');
+  const companyId = z.uuid().parse(req.params.companyId);
+  const dimension = z
+    .enum(['actual', 'budget', 'forecast', 'plan'])
+    .parse(req.query.dimension ?? 'actual');
+  const date = await reportMonth(companyId, req.query.date, dimension);
+  const currency = z.enum(['CC', 'EUR']).parse(req.query.currency ?? 'EUR');
+  res.json(
+    await snapshot((db) =>
+      balanceSheet(db, { companyId, date, currency, dimension, aggregation: 'MONTH' })
+    )
+  );
 });
 
 portfolioRouter.get('/companies', async (req, res) => {
@@ -289,80 +383,85 @@ portfolioRouter.get('/companies/:companyId/performance-data', async (req, res) =
   });
   const queryStart = quarters[0].start;
   const queryEnd = shiftMonth(new Date(`${selectedMonth}T00:00:00Z`), 1);
-  const metricNumbers = [4101200, 4004100, 4004101, 4004200, 4004201, 1300300, 3200030];
   const source = await pool.query(
-    `SELECT m.metric_number,m.name,d.dimension,to_char(d.period,'YYYY-MM-DD') AS period,d.value::text AS value
+    `SELECT m.metric_number,m.name,m.source_data AS metric_source_data,
+       d.dimension,to_char(d.period,'YYYY-MM-DD') AS period,d.value::text AS value,
+       d.source_data->>'status' AS status,d.source_data->>'operator' AS operator
      FROM portal.metrics m
      LEFT JOIN portal.metric_data d ON d.metric_id=m."objectId" AND d."archivedAt" IS NULL
        AND d.period >= $2::date AND d.period < $3::date
-     WHERE m.company_id=$1 AND m.metric_number=ANY($4::integer[]) AND m."archivedAt" IS NULL
+     WHERE m.company_id=$1 AND (m.metric_number=4101200 OR m.metric_number BETWEEN 4004000 AND 4004999) AND m."archivedAt" IS NULL
      ORDER BY m.metric_number,d.period,d.dimension`,
-    [companyId, queryStart, queryEnd, metricNumbers]
+    [companyId, queryStart, queryEnd]
   );
-  const metricMap = new Map<number, { name: string; values: Map<string, Map<string, Decimal>> }>();
+  type CovenantValue = { value: Decimal | null; status: string | null; operator: string | null };
+  const metricMap = new Map<
+    number,
+    {
+      name: string;
+      imported: boolean;
+      values: Map<string, Map<string, CovenantValue>>;
+    }
+  >();
   for (const row of source.rows) {
     const number = Number(row.metric_number);
-    const metric = metricMap.get(number) ?? { name: row.name, values: new Map() };
+    const metric = metricMap.get(number) ?? {
+      name: row.name,
+      imported: Boolean(row.metric_source_data?.covenant_id),
+      values: new Map(),
+    };
     if (metric.name !== row.name)
       throw httpError(422, `Metric Number ${number} ist f\u00fcr diese Company nicht eindeutig.`);
-    if (row.period && row.value !== null) {
+    if (row.period && (row.value !== null || row.status)) {
       const dimension = String(row.dimension);
-      const periods = metric.values.get(dimension) ?? new Map<string, Decimal>();
+      const periods = metric.values.get(dimension) ?? new Map<string, CovenantValue>();
       if (periods.has(row.period))
         throw httpError(422, `Mehrere MetricData-Werte f\u00fcr Metric Number ${number}.`);
-      periods.set(row.period, new Decimal(row.value));
+      periods.set(row.period, {
+        value: row.value === null ? null : new Decimal(row.value),
+        status: row.status ?? null,
+        operator: row.operator ?? null,
+      });
       metric.values.set(dimension, periods);
     }
     metricMap.set(number, metric);
   }
   const direct = (number: number, date: string) =>
-    metricMap.get(number)?.values.get('actual')?.get(date) ?? null;
-  const sum = (number: number, start: string, end: string) => {
-    const values = metricMap.get(number)?.values.get('actual');
-    if (!values) return null;
-    const matching = [...values.entries()].filter(([date]) => date >= start && date <= end);
-    if (!matching.length) return null;
-    return matching.reduce((total, [, value]) => total.plus(value), new Decimal(0));
-  };
+    metricMap.get(number)?.values.get('actual')?.get(date)?.value ?? null;
   const asNumbers = (values: (Decimal | null)[]) =>
     values.map((value) => value?.toNumber() ?? null);
   const actuals = (number: number) => quarters.map((quarter) => direct(number, quarter.period));
-  const leverageName = metricMap.get(4004100)?.name ?? 'Leverage Ratio';
-  const otherCovenantName = metricMap.get(4004200)?.name ?? 'EBITDA/Net Interest';
-  const netInterestRatio = quarters.map((quarter) => {
-    const numerator = sum(1300300, quarter.start, quarter.period);
-    const denominator = sum(3200030, quarter.start, quarter.period);
-    return numerator && denominator && !denominator.isZero() ? numerator.div(denominator) : null;
+  const hasImportedCovenants = [...metricMap.values()].some((metric) => metric.imported);
+  const covenantNumbers = [...metricMap.keys()]
+    .filter(
+      (number) =>
+        number >= 4004000 &&
+        number < 4005000 &&
+        number % 100 === 0 &&
+        (metricMap.get(number)!.imported ||
+          !hasImportedCovenants ||
+          metricMap.get(number)!.values.get('actual')?.size)
+    )
+    .sort((a, b) => a - b);
+  const covenantRow = (number: number, kind: 'value' | 'target', label: string) => ({
+    key: `covenant-${number}`,
+    label,
+    kind,
+    values: asNumbers(actuals(number)),
+    statuses: quarters.map(
+      (quarter) => metricMap.get(number)?.values.get('actual')?.get(quarter.period)?.status ?? null
+    ),
+    operators: quarters.map(
+      (quarter) =>
+        metricMap.get(number)?.values.get('actual')?.get(quarter.period)?.operator ?? null
+    ),
   });
   const rows = [
     { key: 'rcv', label: 'RCV', kind: 'value', values: asNumbers(actuals(4101200)) },
-    { key: 'leverage', label: leverageName, kind: 'value', values: asNumbers(actuals(4004100)) },
-    ...(metricMap.has(4004101)
-      ? [
-          {
-            key: 'leverage-target',
-            label: 'Target',
-            kind: 'target',
-            values: asNumbers(actuals(4004101)),
-          },
-        ]
-      : []),
-    {
-      key: 'interest-cover',
-      label: otherCovenantName,
-      kind: 'value',
-      values: asNumbers(netInterestRatio),
-    },
-    ...(metricMap.has(4004201)
-      ? [
-          {
-            key: 'interest-cover-target',
-            label: 'Target',
-            kind: 'target',
-            values: asNumbers(actuals(4004201)),
-          },
-        ]
-      : []),
+    ...covenantNumbers.flatMap((number) => [
+      covenantRow(number, 'value', metricMap.get(number)!.name),
+      ...(metricMap.has(number + 1) ? [covenantRow(number + 1, 'target', 'Target')] : []),
+    ]),
   ];
   const comments = await pool.query(
     `WITH eligible AS (

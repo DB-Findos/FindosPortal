@@ -19,12 +19,17 @@ import { httpError } from '../shared/errors.js';
 import type { Actor } from './data.js';
 import type { DatabaseClient } from '../database/connection.js';
 import { privateChatEntities } from '../services/chat-schema.js';
+import { privateCustomReportEntities } from '../services/custom-reports/access.js';
+import { customReportInput } from '../services/custom-reports/definition.js';
+import { prepareCustomReport, saveCustomReport } from '../services/custom-reports/store.js';
+import { knowledgeEntities } from '../services/knowledge/schema.js';
 
 const target = { object_id: z.uuid().optional(), expected_version: z.uuid().optional() };
 const viewInput = z
   .object({ name: z.string().trim().min(1).max(100), definition: searchDefinition })
   .strict();
 export const changeInput = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('custom_report'), report: customReportInput, ...target }).strict(),
   z.object({ kind: z.literal('formula'), formula: formulaInput, ...target }).strict(),
   z.object({ kind: z.literal('report'), report: reportInput, ...target }).strict(),
   z.object({ kind: z.literal('view'), view: viewInput, ...target }).strict(),
@@ -55,17 +60,33 @@ export type ChangeProposal = {
 };
 function changeEntity(change: Change) {
   return entityName(
-    change.kind === 'formula'
-      ? 'kpi_formulas'
-      : change.kind === 'report'
-        ? 'report_definitions'
-        : change.kind === 'view'
-          ? 'search_views'
-          : change.entity
+    change.kind === 'custom_report'
+      ? 'custom_reports'
+      : change.kind === 'formula'
+        ? 'kpi_formulas'
+        : change.kind === 'report'
+          ? 'report_definitions'
+          : change.kind === 'view'
+            ? 'search_views'
+            : change.entity
   );
 }
 async function validateChange(db: DatabaseClient, actor: Actor, change: Change) {
   const entity = changeEntity(change);
+  if (knowledgeEntities.has(entity))
+    throw httpError(
+      403,
+      'Knowledge-Einträge über den Knowledge-Bereich bearbeiten; Nutzerzuordnung erfolgt dort automatisch.'
+    );
+  if (change.kind === 'custom_report') {
+    return prepareCustomReport(db, actor, change.report, change.object_id, change.expected_version);
+  }
+  if (privateCustomReportEntities.has(entity))
+    throw httpError(403, 'Custom Reports nur über das Report-Modul ändern.');
+  if (entity === 'application_modules')
+    throw httpError(403, 'Anwendungslinks bitte in den Einstellungen verwalten.');
+  if (entity === 'kpi_data')
+    throw httpError(403, 'KPIData wird ausschließlich durch die Berechnungsengine verwaltet.');
   if (privateChatEntities.has(entity))
     throw httpError(403, 'Chats nur über die Chat-Funktionen ändern.');
   const operation = change.kind === 'archive' ? 'delete' : change.object_id ? 'update' : 'create';
@@ -195,7 +216,16 @@ export async function commitChange(actor: Actor, token: string) {
     }
     await validateChange(db, actor, change);
     let result;
-    if (change.kind === 'formula')
+    if (change.kind === 'custom_report')
+      result = await saveCustomReport(
+        db,
+        actor,
+        change.report,
+        change.object_id,
+        change.expected_version,
+        identity
+      );
+    else if (change.kind === 'formula')
       result = await saveFormula(
         db,
         change.formula,

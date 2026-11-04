@@ -6,6 +6,8 @@ import { permit, type Rights } from '../services/kpi-definitions.js';
 import { snapshot } from '../services/snapshot.js';
 import { httpError } from '../shared/errors.js';
 import { privateChatEntities } from '../services/chat-schema.js';
+import { privateCustomReportEntities } from '../services/custom-reports/access.js';
+import { sharedDocumentScope, documentLinkSql } from '../services/document-schema.js';
 
 export type Actor = { userId: string; rights: Rights; canCommit: boolean; conversationId?: string };
 export const versionFields = ['id', ...auditColumns];
@@ -84,6 +86,8 @@ export const recordInput = z
 export async function getRecord(actor: Actor, raw: unknown) {
   const input = recordInput.parse(raw),
     entity = entityName(input.entity);
+  if (privateCustomReportEntities.has(entity))
+    throw httpError(403, 'Custom Reports mit list_custom_reports/get_custom_report abrufen.');
   if (privateChatEntities.has(entity))
     throw httpError(
       403,
@@ -93,14 +97,47 @@ export async function getRecord(actor: Actor, raw: unknown) {
   const selected = input.fields ?? readableFields(entity).filter((f) => f !== 'data_base64');
   if (selected.some((f) => !readableFields(entity).includes(f)))
     throw httpError(400, 'Unbekanntes oder geschütztes Feld.');
-  const columns = selected.map((f) => '"' + f + '"').join(',');
   return snapshot(async (db) => {
+    const actual = (
+      await db.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_schema='portal' AND table_name=$1`,
+        [entity]
+      )
+    ).rows.map((row) => row.column_name);
+    if (!actual.length)
+      throw httpError(
+        503,
+        'Die registrierte Entity ist im aktuellen SQL-Schema nicht verfügbar. Dies ist kein Beleg für fehlende Werte.'
+      );
+    const unavailable = selected.filter((field) => !actual.includes(field));
+    if (input.fields && unavailable.length)
+      throw httpError(
+        400,
+        'Diese Felder sind im aktuellen SQL-Schema noch nicht verfügbar: ' +
+          unavailable.join(', ') +
+          '. describe_entity zeigt die vorhandenen Spalten.'
+      );
+    const columns = selected
+      .filter((field) => actual.includes(field))
+      .map((field) =>
+        field === 'url' && ['documents', 'knowledge_documents'].includes(entity)
+          ? `(${documentLinkSql(entity)}) AS url`
+          : '"' + field + '"'
+      )
+      .join(',');
     const values: unknown[] = [input.object_id, input.limit + 1, input.offset];
     const owner = entity === 'search_views' ? ' AND owner_id=$4' : '';
     if (owner) values.push(actor.userId);
+    const kpiAccess = entity === 'kpi_data' ? ' AND required_entities <@ $4::text[]' : '';
+    if (kpiAccess)
+      values.push(
+        Object.entries(actor.rights)
+          .filter(([, right]) => right.can_read)
+          .map(([name]) => name)
+      );
     const rows = (
       await db.query(
-        `SELECT ${columns} FROM portal.${entity} WHERE "objectId"=$1 ${owner}
+        `SELECT ${columns} FROM portal.${entity} WHERE "objectId"=$1 AND ${sharedDocumentScope(entity)} ${owner}${kpiAccess}
       ${input.history ? '' : 'AND ' + current} ORDER BY "lastModifiedAt" DESC,id LIMIT $2 OFFSET $3`,
         values
       )
@@ -109,6 +146,7 @@ export async function getRecord(actor: Actor, raw: unknown) {
       rows: rows.slice(0, input.limit).map((row) => publicRow(entity, row)),
       hasMore: rows.length > input.limit,
       nextOffset: rows.length > input.limit ? input.offset + input.limit : null,
+      unavailable_fields: unavailable,
     };
   });
 }

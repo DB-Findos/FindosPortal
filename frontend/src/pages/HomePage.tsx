@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApi } from '../contexts/ApiContext';
+import { useVisibleViewData } from '../contexts/ViewContentContext';
 import { useFormErrors } from '../hooks/useFormErrors';
 import PageHeading from '../components/common/PageHeading';
 import ReportContextFields from '../components/kpi/ReportContextFields';
@@ -22,6 +23,7 @@ export default function HomePage() {
     [result, setResult] = useState<ReportResult | null>(null),
     [busy, setBusy] = useState(false);
   const revision = useRef(0);
+  useVisibleViewData('Standardreporting', { reportId: report, context, result, busy });
   useEffect(() => {
     let active = true;
     Promise.all([request<Report[]>('/kpi/reports'), request<KpiCatalog>('/kpi/catalog')])

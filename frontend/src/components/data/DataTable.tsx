@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
-import { History, Search, Plus, Pencil, Trash2, Table2, Pin } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { History, Search, Plus, Pencil, Trash2, Table2, Pin, ListFilter } from 'lucide-react';
 import { usePinnedColumns } from '../../hooks/usePinnedColumns';
 import ColumnContextMenu from './ColumnContextMenu';
 import { useApi } from '../../contexts/ApiContext';
+import { useVisibleViewData } from '../../contexts/ViewContentContext';
 import { label } from '../../utils/labels';
 import type { Entity, Row } from '../../types/api';
 import RecordForm from './RecordForm';
 import HistoryDialog from './HistoryDialog';
 import FieldSelector, { readSelectedFields, saveSelectedFields } from './FieldSelector';
+import DataTableFilters, { emptyTableQuery } from './DataTableFilters';
+import type { SearchDefinition } from '../../types/search';
 export default function DataTable({
   entity,
   entities,
@@ -20,6 +23,9 @@ export default function DataTable({
   fieldSelector?: boolean;
 }) {
   const { request: api } = useApi();
+  const [query, setQuery] = useState<SearchDefinition>(() => emptyTableQuery(entity.name));
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const loadRevision = useRef(0);
   const [history, setHistory] = useState<Row | null>(null);
   const [rows, setRows] = useState<Row[]>([]),
     [total, setTotal] = useState(0),
@@ -33,26 +39,48 @@ export default function DataTable({
     readSelectedFields(entity.name)
   );
   async function load() {
+    const revision = ++loadRevision.current;
     setLoading(true);
     setError('');
     try {
-      const result = await api(`/data/${entity.name}?page=${page}`);
+      const result =
+        query.joins.length || query.filters.length || query.order.length
+          ? await api('/search/query', 'POST', {
+              definition: query,
+              page,
+              limit: 50,
+              root_records: true,
+            })
+          : await api(`/data/${entity.name}?page=${page}`);
+      if (revision !== loadRevision.current) return;
+      const lastPage = Math.max(1, Math.ceil(result.total / 50));
+      if (page > lastPage) {
+        setPage(lastPage);
+        return;
+      }
       setRows(result.rows);
       setTotal(result.total);
     } catch (e) {
-      setError((e as Error).message);
+      if (revision === loadRevision.current) setError((e as Error).message);
     } finally {
-      setLoading(false);
+      if (revision === loadRevision.current) setLoading(false);
     }
   }
   useEffect(() => {
     setPage(1);
     setSearch('');
     setForm(undefined);
+    if (query.entity !== entity.name) {
+      setQuery(emptyTableQuery(entity.name));
+      setFiltersOpen(false);
+    }
   }, [entity.name]);
   useEffect(() => {
     void load();
-  }, [entity.name, page, api]);
+    return () => {
+      loadRevision.current++;
+    };
+  }, [entity.name, page, api, query]);
   useEffect(() => {
     Promise.all(
       [...new Set(entity.fields.map((f) => f.reference).filter(Boolean))]
@@ -102,6 +130,25 @@ export default function DataTable({
   const filtered = rows.filter((r) =>
     JSON.stringify(r).toLowerCase().includes(search.toLowerCase())
   );
+  useVisibleViewData('Tabelle: ' + entity.name, {
+    entity: entity.name,
+    page,
+    search,
+    query,
+    total,
+    loading,
+    error,
+    columns,
+    rows: filtered.map((row) =>
+      Object.fromEntries(['objectId', ...columns].map((field) => [field, row[field]]))
+    ),
+    referenceLabels: Object.fromEntries(
+      filtered
+        .flatMap((row) => columns.map((field) => String(row[field])))
+        .filter((id) => referenceLabels[id])
+        .map((id) => [id, referenceLabels[id]])
+    ),
+  });
   return (
     <>
       {history && <HistoryDialog entity={entity} row={history} onClose={() => setHistory(null)} />}
@@ -116,6 +163,15 @@ export default function DataTable({
           />
         </div>
         <span className="record-count">{total} Einträge</span>
+        <button
+          type="button"
+          className="secondary"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          <ListFilter size={16} />
+          Filter{query.filters.length ? ` (${query.filters.length})` : ''}
+        </button>
         {fieldSelector && (
           <FieldSelector
             fields={availableColumns}
@@ -132,6 +188,25 @@ export default function DataTable({
           <Plus size={17} /> Neuer Eintrag
         </button>
       </div>
+      {filtersOpen && (
+        <DataTableFilters
+          value={query}
+          entities={entities}
+          busy={loading}
+          onApply={(next) => {
+            loadRevision.current++;
+            setPage(1);
+            setQuery(next);
+            setFiltersOpen(false);
+          }}
+          onReset={() => {
+            loadRevision.current++;
+            setPage(1);
+            setQuery(emptyTableQuery(entity.name));
+            setFiltersOpen(false);
+          }}
+        />
+      )}
       {error && (
         <div role="alert" className="error">
           {error}

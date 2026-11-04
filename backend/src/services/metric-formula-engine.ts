@@ -406,6 +406,86 @@ class MetricFormulaEngine {
     }
     return { bars, warnings: [...this.warnings] };
   }
+  balanceSheet() {
+    const byNumber = (number: number) => {
+      const matches = [...this.metrics.values()].filter((m) => m.metric_number === number);
+      if (matches.length > 1) throw httpError(422, `Metric Number ${number} ist nicht eindeutig.`);
+      return matches[0];
+    };
+    const item = (metric: Metric, sign = 1) => ({
+      metricId: metric.objectId,
+      metricNumber: metric.metric_number,
+      label: metric.name,
+      value: this.monthly(metric.objectId, this.end)?.mul(sign).toNumber() ?? null,
+    });
+    const columns = [
+      { number: 2000000, label: 'Assets' },
+      { number: 2700000, label: 'Equity & Liabilities' },
+    ].map(({ number, label }) => {
+      const root = byNumber(number);
+      if (!root) {
+        this.warnings.add(`Metric Number ${number} ist für diese Company nicht verfügbar.`);
+        return { label, total: null, segments: [] };
+      }
+      const definition = this.definitions.get(root.objectId);
+      let terms = this.incomeTerms(root.objectId);
+      if (definition?.formula_type === 'Range')
+        terms = this.rangeChildren(root.objectId, definition).map((m) => ({
+          id: m.objectId,
+          sign: 1,
+        }));
+      // Split the liability subtotal once, retaining equity separately; never include
+      // a subtotal alongside its children (which would count balances twice).
+      const expanded = (terms ?? [{ id: root.objectId, sign: 1 }]).flatMap((term) => {
+        if (number === 2700000 && this.metrics.get(term.id)?.metric_number === 2300000) {
+          const children = this.incomeTerms(term.id);
+          if (children)
+            return children.map((child) => ({ ...child, sign: child.sign * term.sign }));
+        }
+        return [term];
+      });
+      const combined = new Map<string, number>();
+      for (const term of expanded) combined.set(term.id, (combined.get(term.id) ?? 0) + term.sign);
+      const segments = [...combined]
+        .filter(([, sign]) => sign !== 0)
+        .map(([id, sign]) => {
+          const metric = this.metrics.get(id);
+          if (!metric) throw httpError(422, `Metric ${id} fehlt im Company-Kontext.`);
+          return item(metric, sign);
+        });
+      for (const segment of segments)
+        if (segment.value === null) this.warnings.add(`Keine Bilanzdaten für ${segment.label}.`);
+      return { label, total: this.monthly(root.objectId, this.end)?.toNumber() ?? null, segments };
+    });
+    const cards = [2000000, 2910000, 2900000].map((number) => {
+      const metric = byNumber(number);
+      return metric
+        ? item(metric)
+        : {
+            metricId: '',
+            metricNumber: number,
+            label:
+              number === 2000000
+                ? 'Total Assets'
+                : number === 2910000
+                  ? 'Net Working Capital'
+                  : 'Net Debt (Broad Definition)',
+            value: null,
+          };
+    });
+    const assets = columns[0].total,
+      liabilities = columns[1].total;
+    if (
+      assets !== null &&
+      liabilities !== null &&
+      Math.abs(assets - liabilities) > Math.max(Math.abs(assets), Math.abs(liabilities), 1) * 1e-8
+    )
+      this.warnings.add('Assets und Equity & Liabilities weichen voneinander ab.');
+    const ids = [...cards, ...columns.flatMap((column) => column.segments)]
+      .map((metric) => metric.metricId)
+      .filter(Boolean);
+    return { cards, columns, history: this.history(ids), warnings: [...this.warnings] };
+  }
   history(metricIds: string[]) {
     return [...new Set(metricIds)].map((metricId) => {
       const metric = this.metrics.get(metricId)!;
@@ -445,5 +525,18 @@ export async function incomeStatement(db: DatabaseClient, context: IncomeContext
     engineVersion: 1,
     ...waterfall,
     history: engine.history(waterfall.bars.map((bar) => bar.metricId)),
+  };
+}
+
+export async function balanceSheet(db: DatabaseClient, context: IncomeContext) {
+  // Balance sheets are point-in-time stocks; never sum them across YTD/LTM.
+  const engine = new MetricFormulaEngine(db, { ...context, aggregation: 'MONTH' });
+  await engine.load();
+  return {
+    company: engine.company,
+    date: context.date,
+    dimension: context.dimension,
+    currency: { mode: context.currency, code: engine.targetCurrency },
+    ...engine.balanceSheet(),
   };
 }

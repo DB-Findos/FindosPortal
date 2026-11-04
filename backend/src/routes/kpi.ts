@@ -16,9 +16,34 @@ import { reportWithItems, saveReport } from '../services/kpi-reports.js';
 import { KpiEngine } from '../services/kpi-engine.js';
 import { entityName, definitions } from '../entities.js';
 import { fieldError } from '../shared/errors.js';
+import { enqueueKpiCalculation, getKpiCalculation } from '../services/kpi-data/jobs.js';
 
 export const kpiRouter = Router();
 kpiRouter.use(authenticate);
+kpiRouter.post('/recalculate', async (req, res) => {
+  const rights = await permissions(req.userId!);
+  permit(rights, 'kpi_formulas', 'update');
+  permit(rights, 'variable_map', 'read');
+  const input = z
+    .object({ formula_id: z.uuid().optional() })
+    .strict()
+    .parse(req.body ?? {});
+  const job = await transaction(req.userId!, (client) =>
+    enqueueKpiCalculation(client, req.userId!, input.formula_id)
+  );
+  res.status(202).json(job);
+});
+kpiRouter.get('/calculations/latest', async (req, res) => {
+  const rights = await permissions(req.userId!);
+  permit(rights, 'kpi_formulas');
+  const formula = z.uuid().optional().parse(req.query.formula_id);
+  res.json(await getKpiCalculation(undefined, formula));
+});
+kpiRouter.get('/calculations/:id', async (req, res) => {
+  const rights = await permissions(req.userId!);
+  permit(rights, 'kpi_formulas');
+  res.json(await getKpiCalculation(z.uuid().parse(req.params.id)));
+});
 async function snapshot<T>(work: (client: DatabaseClient) => Promise<T>) {
   const client = await pool.connect();
   try {

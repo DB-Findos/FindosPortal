@@ -5,6 +5,9 @@ import { activeRow, current } from '../repositories/entities.js';
 import { calculate, monthWindow, parseFormula } from './formula-language.js';
 import { formulaWithVariables, numericSources, permit, type Rights } from './kpi-definitions.js';
 import type { ReportContext } from './kpi-schema.js';
+import type { KpiSourceData } from './kpi-data/sources.js';
+import { cumulativeSourceValues } from './kpi-data/sources.js';
+import { readMonthlyKpiData } from './kpi-data/read.js';
 
 const D = Decimal.clone({ precision: 40 });
 class Missing extends Error {}
@@ -29,10 +32,12 @@ export class KpiEngine {
   private cache = new Map<string, KpiResult>();
   private count = 0;
   private companyCurrencyCache?: Promise<string>;
+  private monthlyResults?: Promise<Map<string, KpiResult>>;
   constructor(
     private client: DatabaseClient,
     private rights: Rights,
-    private context: ReportContext
+    private context: ReportContext,
+    private options: { currencyDate?: string; bypassStored?: boolean; sources?: KpiSourceData } = {}
   ) {}
   private async companyCurrency(): Promise<string> {
     if (!this.companyCurrencyCache)
@@ -49,12 +54,14 @@ export class KpiEngine {
   }
   private async rate(currency: string, period: string): Promise<Decimal> {
     if (currency === 'EUR') return new D(1);
-    const rows = (
-      await this.client.query(
-        `SELECT index_value::text AS index_value FROM portal.index_rates WHERE base_currency='EUR' AND currency=$1 AND period=$2::date AND ${current} ORDER BY as_of_date DESC LIMIT 1`,
-        [currency, period]
-      )
-    ).rows;
+    const rows = this.options.sources
+      ? (this.options.sources.rates.get(`${currency}:${period}`) ?? [])
+      : (
+          await this.client.query(
+            `SELECT index_value::text AS index_value FROM portal.index_rates WHERE base_currency='EUR' AND currency=$1 AND period=$2::date AND ${current} ORDER BY as_of_date DESC LIMIT 1`,
+            [currency, period]
+          )
+        ).rows;
     if (!rows.length)
       throw new Missing(`Kein Indexkurs EUR/${currency} für ${period.slice(0, 7)} vorhanden.`);
     const value = new D(rows[0].index_value);
@@ -73,7 +80,12 @@ export class KpiEngine {
     const targetRate = await this.rate(target, period);
     return new D(value).div(sourceRate).mul(targetRate).toString();
   }
-  private metricIsMonetary(metric: { currency?: string | null; unit?: string | null }) {
+  private metricIsMonetary(metric: {
+    currency?: string | null;
+    unit?: string | null;
+    metric_number?: number;
+  }) {
+    if (metric.metric_number === 4002900 || metric.metric_number === 4101200) return false; // Findos Share and RCV are dimensionless despite the source unit "000".
     if (
       /(%|percent|ratio|multiple|\b(?:x|days?|months?|years?|fte|headcount|units?|count|number)\b)/i.test(
         metric.unit || ''
@@ -163,8 +175,23 @@ export class KpiEngine {
       throw new Error('Zirkuläre oder zu tief verschachtelte KPI.');
     const cached = this.cache.get(id);
     if (cached) return cached;
+    // Bridge history can explicitly use another month's FX rates. Such results
+    // must never reuse a normal monthly materialization.
+    if (
+      !this.options.bypassStored &&
+      !this.options.sources &&
+      (!this.options.currencyDate ||
+        this.options.currencyDate === `${this.context.date.slice(0, 7)}-01`)
+    ) {
+      this.monthlyResults ??= readMonthlyKpiData(this.client, this.rights, this.context);
+      const stored = (await this.monthlyResults).get(id);
+      if (stored) {
+        this.cache.set(id, stored);
+        return stored;
+      }
+    }
     const result = await this.evaluate(
-      await formulaWithVariables(this.client, id),
+      this.options.sources?.formulas.get(id) ?? (await formulaWithVariables(this.client, id)),
       new Set(path).add(id)
     );
     this.cache.set(id, result);
@@ -193,12 +220,14 @@ export class KpiEngine {
         if (['MONTH', 'LTM', 'YTD'].includes(v.aggregation)) {
           permit(this.rights, 'metrics');
           permit(this.rights, 'companies');
-          const metrics = (
-            await this.client.query(
-              `SELECT "objectId",currency,unit FROM portal.metrics WHERE company_id=$1 AND metric_number=$2 AND ${current}`,
-              [this.context.company_id, v.metric_number]
-            )
-          ).rows;
+          const metrics = this.options.sources
+            ? (this.options.sources.metrics.get(v.metric_number) ?? [])
+            : (
+                await this.client.query(
+                  `SELECT "objectId",currency,unit,metric_number FROM portal.metrics WHERE company_id=$1 AND metric_number=$2 AND ${current}`,
+                  [this.context.company_id, v.metric_number]
+                )
+              ).rows;
           if (!metrics.length)
             throw new Missing(
               `${v.identifier}: Metric ${v.metric_number} fehlt für diese Company.`
@@ -208,12 +237,23 @@ export class KpiEngine {
               `${v.identifier}: Metric Number ${v.metric_number} ist für diese Company nicht eindeutig.`
             );
           const window = monthWindow(this.context.date, v.aggregation, v.prior_year);
-          const rows = (
-            await this.client.query(
-              `SELECT to_char(date_trunc('month',period),'YYYY-MM-DD') AS month, value::text AS value, currency FROM portal.metric_data WHERE metric_id=$1 AND dimension=$2 AND period >= $3::date AND period < $4::date AND ${current} ORDER BY period`,
-              [metrics[0].objectId, v.dimension || this.context.dimension, window.start, window.end]
-            )
-          ).rows;
+          const rows = this.options.sources
+            ? (
+                this.options.sources.metricData.get(
+                  `${metrics[0].objectId}:${v.dimension || this.context.dimension}`
+                ) ?? []
+              ).filter((row) => row.month >= window.start && row.month < window.end)
+            : (
+                await this.client.query(
+                  `SELECT to_char(date_trunc('month',period),'YYYY-MM-DD') AS month, value::text AS value, currency FROM portal.metric_data WHERE metric_id=$1 AND dimension=$2 AND period >= $3::date AND period < $4::date AND ${current} ORDER BY period`,
+                  [
+                    metrics[0].objectId,
+                    v.dimension || this.context.dimension,
+                    window.start,
+                    window.end,
+                  ]
+                )
+              ).rows;
           const counts = new Map<string, number>();
           for (const row of rows) counts.set(row.month, (counts.get(row.month) || 0) + 1);
           const ambiguous = [...counts].find(([, count]) => count > 1);
@@ -226,7 +266,7 @@ export class KpiEngine {
             throw new Missing(
               `${v.identifier}: Fehlende Werte für ${missing.map((m) => m.slice(0, 7)).join(', ')} (${v.dimension || this.context.dimension}).`
             );
-          const ratePeriod = `${this.context.date.slice(0, 7)}-01`;
+          const ratePeriod = this.options.currencyDate || `${this.context.date.slice(0, 7)}-01`;
           const metric = metrics[0];
           const monetary = this.metricIsMonetary(metric);
           const sourceDefault = metric.currency || (await this.companyCurrency());
@@ -242,6 +282,57 @@ export class KpiEngine {
           value = total.toString();
           if (monetary) variableCurrency = targetCurrency;
           period = `${window.start.slice(0, 7)} – ${window.months.at(-1)!.slice(0, 7)}`;
+        } else if (v.aggregation === 'CUMULATIVE') {
+          if (v.entity !== 'capital_movements' || v.field !== 'value')
+            throw new Error('Ungültige Quelle für Stichtagssumme.');
+          const filter = v.filter;
+          if (
+            filter &&
+            (filter.operator !== 'equals' || !['type', 'reason'].includes(filter.field))
+          )
+            throw new Error('Ungültiger Filter für CapitalMovements.');
+          const clauses = [
+            'company_id=$1',
+            current,
+            "(movement_date < date_trunc('month',$2::date) + interval '1 month' OR movement_date IS NULL)",
+          ];
+          const params = [this.context.company_id, this.context.date];
+          if (filter) {
+            params.push(filter.value!);
+            clauses.push(`"${filter.field}"=$3`);
+          }
+          const rows = this.options.sources
+            ? cumulativeSourceValues(
+                this.options.sources,
+                monthWindow(this.context.date, 'MONTH', false).end,
+                filter
+              )
+            : (
+                await this.client.query(
+                  `SELECT currency,coalesce(sum(value) FILTER (WHERE movement_date IS NOT NULL),0)::text AS value,
+             count(*) FILTER (WHERE movement_date IS NULL)::int AS undated
+             FROM portal.capital_movements WHERE ${clauses.join(' AND ')} GROUP BY currency`,
+                  params
+                )
+              ).rows;
+          let total = new D(0),
+            undated = 0;
+          for (const row of rows) {
+            total = total.plus(
+              await this.convert(
+                row.value,
+                row.currency,
+                targetCurrency,
+                this.options.currencyDate || `${this.context.date.slice(0, 7)}-01`
+              )
+            );
+            undated += row.undated;
+          }
+          value = total.toString();
+          variableCurrency = targetCurrency;
+          period = `bis einschließlich ${this.context.date.slice(0, 7)}`;
+          if (undated)
+            result.message = `${undated} Kapitalbewegung(en) ohne Datum wurden bei der Stichtagssumme nicht berücksichtigt.`;
         } else if (v.aggregation === 'FIXED') {
           if (
             !numericSources(this.rights)
@@ -255,12 +346,14 @@ export class KpiEngine {
           value = new D(String(record[v.field])).toString();
           if (this.fixedFieldIsMonetary(v.entity, v.field)) {
             const sourceCurrency =
-              record.data_currency || record.company_currency || (await this.companyCurrency());
+              v.entity === 'deal_data' && v.field === 'findos_investment_value'
+                ? 'EUR'
+                : record.data_currency || record.company_currency || (await this.companyCurrency());
             value = await this.convert(
               value,
               sourceCurrency,
               targetCurrency,
-              `${this.context.date.slice(0, 7)}-01`
+              this.options.currencyDate || `${this.context.date.slice(0, 7)}-01`
             );
             variableCurrency = targetCurrency;
           }

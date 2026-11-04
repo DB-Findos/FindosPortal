@@ -18,13 +18,22 @@ import {
   commitStoredChange,
 } from '../services/chat-history.js';
 import { ownDocument, saveDocument } from '../services/chat-documents.js';
+import { chatViewContext } from '../services/chat-context.js';
+import type { ChatProgress } from '../services/chat-progress.js';
+import { aiRunsRouter } from './ai-runs.js';
 
 export const aiRouter = Router();
 aiRouter.use(authenticate);
-aiRouter.use(
-  '/chat',
-  rateLimit({ windowMs: 60000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false })
+const chatLimiter = rateLimit({
+  windowMs: 60000,
+  limit: 20,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+});
+aiRouter.use('/chat', (req, res, next) =>
+  req.method === 'POST' ? chatLimiter(req, res, next) : next()
 );
+aiRouter.use('/chat/runs', aiRunsRouter);
 const chatInput = z.object({
   conversation_id: z.uuid(),
   message_id: z.uuid(),
@@ -32,49 +41,100 @@ const chatInput = z.object({
   document_ids: z.array(z.uuid()).max(10).default([]),
   model: z.string().min(1).max(100),
   reasoning_effort: reasoningEffort,
-  context: z.object({
-    path: z.string().max(500),
-    view: z.string().max(200),
-    entity: z.string().max(100).nullable(),
-  }),
+  context: chatViewContext,
 });
 aiRouter.post('/chat', async (req, res) => {
   const input = chatInput.parse(req.body);
   validateChatModel(input.model, input.reasoning_effort);
   const begun = await beginMessage(req.userId!, input);
-  if (!begun.cached) {
-    try {
-      const result = await runPortalChat(
-        {
-          userId: req.userId!,
-          rights: await permissions(req.userId!),
-          canCommit: false,
-          conversationId: input.conversation_id,
-        },
-        { ...input, messages: modelHistory(begun.messages) }
-      );
-      await finishMessage(req.userId!, input.conversation_id, input.message_id, result.reply, {
-        changes: result.changes,
-        steps: result.steps,
-        document_ids: result.document_ids,
-      });
-    } catch (error) {
-      const e = error as { status?: number; message?: string };
-      await finishMessage(
-        req.userId!,
-        input.conversation_id,
-        input.message_id,
-        e.status && e.status < 600
-          ? e.message || 'KI-Anfrage fehlgeschlagen.'
-          : 'KI-Anfrage fehlgeschlagen. Bitte erneut versuchen.',
-        {},
-        'error'
-      );
-    }
+  const streaming = req.get('accept')?.includes('application/x-ndjson');
+  let connected = true;
+  const send = (event: unknown) => {
+    if (streaming && connected && !res.writableEnded) res.write(JSON.stringify(event) + '\n');
+  };
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
+  if (streaming) {
+    res.set({
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
+      'Cache-Control': 'no-cache, no-store, no-transform',
+      'X-Accel-Buffering': 'no',
+    });
+    res.flushHeaders();
+    heartbeat = setInterval(() => send({ type: 'ping' }), 10000);
+    heartbeat.unref();
+    res.on('close', () => {
+      connected = false;
+      clearInterval(heartbeat);
+    });
   }
-  res.json(await readConversation(req.userId!, input.conversation_id));
+  const progress: ChatProgress[] = [];
+  try {
+    if (!begun.cached) {
+      try {
+        const result = await runPortalChat(
+          {
+            userId: req.userId!,
+            rights: await permissions(req.userId!),
+            canCommit: false,
+            conversationId: input.conversation_id,
+          },
+          { ...input, messages: modelHistory(begun.messages) },
+          (event) => {
+            progress.push(event);
+            send({ type: 'progress', progress: event });
+          }
+        );
+        await finishMessage(req.userId!, input.conversation_id, input.message_id, result.reply, {
+          changes: result.changes,
+          steps: result.steps,
+          document_ids: result.document_ids,
+          progress: result.progress,
+          review: result.review,
+          orchestration: result.orchestration,
+        });
+      } catch (error) {
+        const e = error as { status?: number; message?: string };
+        await finishMessage(
+          req.userId!,
+          input.conversation_id,
+          input.message_id,
+          e.status && e.status < 600
+            ? e.message || 'KI-Anfrage fehlgeschlagen.'
+            : 'KI-Anfrage fehlgeschlagen. Bitte erneut versuchen.',
+          { progress },
+          'error'
+        );
+      }
+    }
+    const detail = await readConversation(req.userId!, input.conversation_id);
+    if (streaming) {
+      send({ type: 'complete', detail });
+      if (connected) res.end();
+    } else res.json(detail);
+  } catch (error) {
+    if (!streaming) throw error;
+    send({
+      type: 'error',
+      message: 'Die Chatantwort konnte nicht geladen werden. Bitte den Verlauf erneut öffnen.',
+    });
+    if (connected) res.end();
+  } finally {
+    clearInterval(heartbeat);
+  }
 });
-aiRouter.get('/models', (_req, res) => res.json(chatModels()));
+aiRouter.get('/models', (_req, res) =>
+  res.json({
+    ...chatModels(),
+    capabilities: {
+      chat_revision: 3,
+      view_context: true,
+      answer_review: true,
+      reviewer_research: true,
+      planned_tasks: true,
+      live_runs: true,
+    },
+  })
+);
 aiRouter.get('/conversations', async (req, res) =>
   res.json(
     await listConversations(

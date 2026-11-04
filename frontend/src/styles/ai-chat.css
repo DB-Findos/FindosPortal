@@ -1,8 +1,8 @@
 .ai-chat-toggle {
   position: fixed;
   z-index: 34;
-  top: calc(var(--topbar-height) + 18px);
-  right: 16px;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  right: calc(20px + env(safe-area-inset-right, 0px));
   display: flex;
   gap: 8px;
   border-radius: 24px;
@@ -14,12 +14,11 @@
 }
 @media (max-width: 700px) {
   .ai-chat-toggle {
-    top: 10px;
-    right: 146px;
     width: 44px;
     height: 44px;
     padding: 0;
     gap: 0;
+    justify-content: center;
     font-size: 0;
   }
   .ai-chat-toggle svg:last-child {
@@ -361,6 +360,116 @@
   padding-left: 12px;
   color: var(--muted);
 }
+.ai-answer {
+  min-width: 0;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.ai-answer > :first-child {
+  margin-top: 0;
+}
+.ai-answer > :last-child {
+  margin-bottom: 0;
+}
+.ai-answer h1 {
+  font-size: 18px;
+}
+.ai-answer h2 {
+  font-size: 16px;
+}
+.ai-answer h3,
+.ai-answer h4,
+.ai-answer h5,
+.ai-answer h6 {
+  font-size: 14px;
+  margin: 18px 0 8px;
+  line-height: 1.5;
+}
+.ai-answer ul,
+.ai-answer ol {
+  margin: 10px 0 16px;
+  padding-left: 22px;
+}
+.ai-answer li {
+  margin: 5px 0;
+}
+.ai-answer li p {
+  margin: 4px 0 8px;
+}
+.ai-answer :not(pre) > code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  white-space: break-spaces;
+  overflow-wrap: anywhere;
+}
+.ai-answer pre {
+  line-height: 1.6;
+  white-space: pre;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+}
+.ai-answer pre code {
+  font-size: 12px;
+  padding: 0;
+  background: none;
+  border: 0;
+}
+.ai-answer hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 18px 0;
+}
+.ai-answer a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ai-answer input[type='checkbox'] {
+  width: auto;
+  margin: 0 6px 0 0;
+}
+.ai-answer-table {
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 14px 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.ai-message-content .ai-answer-table table {
+  display: table;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.ai-answer-table th,
+.ai-answer-table td {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  box-shadow: none;
+  min-width: 90px;
+  max-width: 280px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 9px 12px;
+  background: var(--surface);
+  vertical-align: top;
+  line-height: 1.6;
+}
+.ai-answer-table th {
+  font-weight: 600;
+  background: var(--background);
+  color: var(--text);
+}
+.ai-answer-table tbody tr:last-child td {
+  border-bottom: 0;
+}
 .ai-document {
   display: block;
   padding: 10px 12px;
@@ -421,6 +530,227 @@
 .ai-thinking-dots {
   letter-spacing: 3px;
   animation: ai-pulse 1.4s infinite;
+}
+.ai-activity {
+  min-width: 0;
+  margin: 4px 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ai-activity-running {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.ai-activity-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-activity-heading strong {
+  font-weight: 500;
+}
+.ai-activity-timer {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+.ai-activity-pulse {
+  animation: ai-pulse 1.4s infinite;
+}
+.ai-activity-current {
+  margin: 9px 0 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.ai-activity-details {
+  margin-top: 9px;
+}
+.ai-activity-details summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.ai-activity-details summary::-webkit-details-marker {
+  display: none;
+}
+.ai-activity-details[open] summary > svg {
+  transform: rotate(90deg);
+}
+.ai-activity-details summary > span {
+  min-width: 19px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 10px;
+}
+.ai-activity-details ol {
+  padding: 0 4px 0 0;
+  margin: 10px 0 0;
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.ai-activity-step {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 9px;
+  padding: 6px 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.ai-activity-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  padding-top: 2px;
+}
+.ai-activity-review,
+.ai-activity-retry {
+  color: var(--primary);
+}
+.ai-task-plan {
+  margin-top: 12px;
+  min-width: 0;
+}
+.ai-task-objective {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1.5;
+}
+.ai-task-policy {
+  font-size: 10px;
+  line-height: 1.5;
+}
+.ai-task-scope {
+  margin-top: 8px;
+}
+.ai-task-scope summary,
+.ai-task-notes summary {
+  cursor: pointer;
+  font-size: 11px;
+}
+.ai-task-scope ul,
+.ai-task-notes ul {
+  padding-left: 16px;
+  margin: 7px 0;
+}
+.ai-task-plan .ai-task-list {
+  max-height: none;
+  overflow: visible;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ai-task-row {
+  display: grid;
+  grid-template-columns: 17px minmax(0, 1fr);
+  gap: 10px;
+  padding: 9px 0;
+  position: relative;
+}
+.ai-task-row > svg {
+  margin-top: 2px;
+}
+.ai-task-row > div {
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  padding-left: 10px;
+}
+.ai-task-row strong {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.5;
+}
+.ai-task-row p {
+  margin: 5px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.ai-task-row.accepted > svg {
+  color: var(--primary);
+}
+.ai-task-row.blocked > svg,
+.ai-task-row.failed > svg {
+  color: #b27b25;
+}
+.ai-task-row.running > svg,
+.ai-task-row.checking > svg {
+  color: var(--primary);
+}
+.ai-task-spinner {
+  animation: ai-task-turn 2s linear infinite;
+}
+.ai-task-notes {
+  margin-top: 7px;
+}
+.ai-task-reason {
+  margin-top: 7px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+  border-radius: 7px;
+}
+.ai-task-reason > span,
+.ai-task-criteria > span {
+  font-size: 10px;
+  font-weight: 600;
+}
+.ai-task-plan .ai-task-events {
+  max-height: 240px;
+  padding: 0;
+  margin-top: 8px;
+  list-style: none;
+}
+.ai-task-events > li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px;
+  padding: 5px 0;
+}
+.ai-task-events time {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  padding-top: 5px;
+}
+.ai-task-events p {
+  margin-top: 2px;
+}
+.ai-task-criteria {
+  font-size: 11px;
+  margin-top: 9px;
+}
+.ai-task-plan .ai-task-notes ul {
+  max-height: none;
+  overflow: visible;
+}
+.ai-chat .ai-stop {
+  background: var(--text);
+  color: var(--surface);
+}
+@keyframes ai-task-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-task-spinner {
+    animation: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-activity-pulse {
+    animation: none;
+  }
 }
 @keyframes ai-pulse {
   50% {

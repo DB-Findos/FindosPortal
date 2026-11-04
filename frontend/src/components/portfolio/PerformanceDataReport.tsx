@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MessageSquareText, RefreshCw } from 'lucide-react';
 import { useApi } from '../../contexts/ApiContext';
+import { useVisibleViewData } from '../../contexts/ViewContentContext';
 import './PerformanceUpdateReport.css';
 
 type Quarter = { start: string; period: string; year: number; label: string };
@@ -9,6 +10,8 @@ type CovenantRow = {
   label: string;
   kind: 'value' | 'target';
   values: (number | null)[];
+  statuses?: (string | null)[];
+  operators?: (string | null)[];
 };
 type Comment = {
   company_source_name: string;
@@ -56,6 +59,13 @@ export default function PerformanceDataReport({
   }, [companyId, date, request]);
 
   const currentReport = report?.date === date ? report : null;
+  useVisibleViewData('Performance Data & Kommentare', {
+    companyId,
+    date,
+    loading,
+    error,
+    report: currentReport,
+  });
   const yearGroups = useMemo(() => {
     const groups: { year: number; count: number }[] = [];
     for (const quarter of currentReport?.quarters ?? []) {
@@ -68,7 +78,11 @@ export default function PerformanceDataReport({
 
   return (
     <section className="performance-data-report" aria-label="Performance Data">
-      {error && <div className="performance-message error" role="alert">{error}</div>}
+      {error && (
+        <div className="performance-message error" role="alert">
+          {error}
+        </div>
+      )}
       {loading && !currentReport && (
         <div className="performance-message">
           <RefreshCw className="performance-spin" size={16} /> Performance Data wird geladen …
@@ -80,14 +94,21 @@ export default function PerformanceDataReport({
             <table className="performance-data-table">
               <thead>
                 <tr>
-                  <th className="performance-data-corner" rowSpan={2}>Performance Data</th>
+                  <th className="performance-data-corner" rowSpan={2}>
+                    Performance Data
+                  </th>
                   {yearGroups.map((group) => (
-                    <th key={group.year} colSpan={group.count}>{group.year}</th>
+                    <th key={group.year} colSpan={group.count}>
+                      {group.year}
+                    </th>
                   ))}
                 </tr>
                 <tr>
                   {currentReport.quarters.map((quarter, index) => (
-                    <th className={index === currentReport.quarters.length - 1 ? 'selected' : ''} key={quarter.start}>
+                    <th
+                      className={index === currentReport.quarters.length - 1 ? 'selected' : ''}
+                      key={quarter.start}
+                    >
                       {quarter.label}
                     </th>
                   ))}
@@ -98,8 +119,24 @@ export default function PerformanceDataReport({
                   <tr className={row.kind === 'target' ? 'is-target' : ''} key={row.key}>
                     <th scope="row">{row.label}</th>
                     {row.values.map((value, index) => (
-                      <td className={index === row.values.length - 1 ? 'selected' : ''} key={`${row.key}-${index}`}>
-                        {value === null ? '–' : new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}
+                      <td
+                        className={index === row.values.length - 1 ? 'selected' : ''}
+                        key={`${row.key}-${index}`}
+                      >
+                        {value !== null && row.operators?.[index] ? `${row.operators[index]} ` : ''}
+                        {value === null
+                          ? row.statuses?.[index] && row.statuses[index] !== 'Numeric'
+                            ? row.statuses[index]
+                            : '–'
+                          : new Intl.NumberFormat('de-DE', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            }).format(value)}
+                        {value !== null &&
+                        row.statuses?.[index] &&
+                        row.statuses[index] !== 'Numeric'
+                          ? ` · ${row.statuses[index]}`
+                          : ''}
                       </td>
                     ))}
                   </tr>

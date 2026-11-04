@@ -21,9 +21,13 @@
     "db:import-performance-update-comments": "tsx backend/src/import-performance-update-comments.ts --apply",
     "db:import-metric-formulas": "tsx backend/src/import-metric-formulas.ts --apply",
     "db:seed": "npm run db:seed -w backend",
+    "db:seed-bridge": "tsx backend/src/seed-bridge-reporting.ts",
+    "db:import-capital-movements": "tsx backend/src/import-capital-movements.ts --apply",
     "test:e2e": "tsx backend/src/e2e.ts",
     "format": "prettier --write \"frontend/src/**/*.{ts,tsx,css}\" \"backend/src/**/*.ts\"",
-    "format:check": "prettier --check \"frontend/src/**/*.{ts,tsx,css}\" \"backend/src/**/*.ts\""
+    "format:check": "prettier --check \"frontend/src/**/*.{ts,tsx,css}\" \"backend/src/**/*.ts\"",
+    "db:import-covenants": "tsx backend/src/import-covenants.ts --apply",
+    "db:recalculate-kpis": "tsx backend/src/recalculate-kpis.ts"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

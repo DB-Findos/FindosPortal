@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   BriefcaseBusiness,
@@ -11,15 +11,8 @@ import {
   PanelLeftOpen,
   WalletCards,
 } from 'lucide-react';
-import { useApi } from '../../contexts/ApiContext';
-type View = { name: string; label: string; path: string; icon: string };
-type Section = { name: string; label: string; icon: string; views: View[] };
-type PortfolioCompany = {
-  objectId: string;
-  name: string;
-  internal_name: string | null;
-  status: string;
-};
+import { useAuth } from '../../contexts/AuthContext';
+import type { NavigationView } from '../../types/navigation';
 const icons: Record<string, typeof Folder> = {
   'briefcase-business': BriefcaseBusiness,
   'layout-dashboard': LayoutDashboard,
@@ -27,48 +20,26 @@ const icons: Record<string, typeof Folder> = {
   'wallet-cards': WalletCards,
 };
 export default function PortfolioSidebar() {
-  const { request } = useApi();
-  const requestRef = useRef(request);
-  requestRef.current = request;
+  const {
+    navigation: sections,
+    portfolioCompanies: companies,
+    portfolioFunds: funds,
+    navigationError: error,
+  } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sections, setSections] = useState<Section[]>([]);
-  const [companies, setCompanies] = useState<PortfolioCompany[]>([]);
-  const [companiesLoaded, setCompaniesLoaded] = useState(false);
   const [companiesOpen, setCompaniesOpen] = useState(location.pathname === '/portfolio/company');
+  const [fundsOpen, setFundsOpen] = useState(location.pathname === '/portfolio/fund');
   const [collapsed, setCollapsed] = useState(
     () => window.matchMedia('(max-width: 1200px)').matches
   );
-  const [error, setError] = useState('');
-  useEffect(() => {
-    let active = true;
-    requestRef
-      .current<Section[]>('/navigation')
-      .then((value) => {
-        if (active) setSections(value);
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
   useEffect(() => {
     if (location.pathname === '/portfolio/company') {
       setCompaniesOpen(true);
-      if (!companiesLoaded) {
-        requestRef
-          .current<PortfolioCompany[]>('/portfolio/companies')
-          .then((value) => {
-            setCompanies(value);
-            setCompaniesLoaded(true);
-          })
-          .catch((e) => setError(e.message));
-      }
     }
-  }, [location.pathname, companiesLoaded]);
-  const toggleCompanies = (view: View) => {
+    if (location.pathname === '/portfolio/fund') setFundsOpen(true);
+  }, [location.pathname]);
+  const toggleCompanies = (view: NavigationView) => {
     if (collapsed) setCollapsed(false);
     if (location.pathname !== view.path) navigate(view.path);
     setCompaniesOpen((open) => !open);
@@ -85,7 +56,7 @@ export default function PortfolioSidebar() {
               <span className="portfolio-nav-mark">
                 <BriefcaseBusiness size={17} />
               </span>
-              <span>Portfolio</span>
+              <span>Reporting</span>
             </>
           )}
         </div>
@@ -112,6 +83,62 @@ export default function PortfolioSidebar() {
               )}
               {section.views.map((view) => {
                 const Icon = icons[view.icon] || ChevronRight;
+                if (view.name === 'fund') {
+                  const active = location.pathname === view.path;
+                  return (
+                    <div className="portfolio-company-nav" key={view.path}>
+                      <button
+                        className={'portfolio-nav-link' + (active ? ' active' : '')}
+                        title={collapsed ? 'Funds' : undefined}
+                        aria-expanded={!collapsed && fundsOpen}
+                        onClick={() => {
+                          if (collapsed) setCollapsed(false);
+                          if (!active) navigate(view.path);
+                          setFundsOpen((open) => !open);
+                        }}
+                      >
+                        <Icon size={17} />
+                        {!collapsed && (
+                          <>
+                            <span>Funds</span>
+                            {fundsOpen ? (
+                              <ChevronDown className="portfolio-nav-chevron" size={14} />
+                            ) : (
+                              <ChevronRight className="portfolio-nav-chevron" size={14} />
+                            )}
+                          </>
+                        )}
+                      </button>
+                      {!collapsed && fundsOpen && (
+                        <div className="portfolio-company-list">
+                          {funds.map((fund) => (
+                            <button
+                              key={fund.objectId}
+                              title={fund.name}
+                              className={
+                                'portfolio-company-item' +
+                                (new URLSearchParams(location.search).get('fund') === fund.objectId
+                                  ? ' active'
+                                  : '')
+                              }
+                              onClick={() =>
+                                navigate(
+                                  `${view.path}?fund=${encodeURIComponent(fund.objectId)}&tab=bridge`
+                                )
+                              }
+                            >
+                              <WalletCards size={16} />
+                              <span className="portfolio-company-name">{fund.name}</span>
+                            </button>
+                          ))}
+                          {!funds.length && (
+                            <span className="portfolio-company-hint">Keine Funds verfügbar.</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
                 if (view.name === 'company') {
                   const active = location.pathname === view.path;
                   return (
@@ -136,12 +163,7 @@ export default function PortfolioSidebar() {
                       </button>
                       {!collapsed && companiesOpen && (
                         <div className="portfolio-company-list">
-                          {!companiesLoaded && (
-                            <span className="portfolio-company-hint">
-                              Companies werden geladen …
-                            </span>
-                          )}
-                          {companiesLoaded && companies.length === 0 && (
+                          {companies.length === 0 && (
                             <span className="portfolio-company-hint">
                               Keine Companies mit Status P - Portfolio.
                             </span>
@@ -200,7 +222,7 @@ export default function PortfolioSidebar() {
           </p>
         )}
       </nav>
-      {!collapsed && <div className="portfolio-sidebar-foot">Portfolio Management</div>}
+      {!collapsed && <div className="portfolio-sidebar-foot">Portfolio Reporting</div>}
     </aside>
   );
 }

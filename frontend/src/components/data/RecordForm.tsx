@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useApi } from '../../contexts/ApiContext';
+import { useVisibleViewData } from '../../contexts/ViewContentContext';
 import { label } from '../../utils/labels';
 import type { Entity, Row } from '../../types/api';
 import { useFormErrors } from '../../hooks/useFormErrors';
@@ -11,14 +12,19 @@ export default function RecordForm({
   entities,
   onClose,
   onSave,
+  initialValues = {},
+  hiddenFields = [],
 }: {
   entity: Entity;
   row: Row | null;
   entities: Entity[];
   onClose: () => void;
   onSave: () => void;
+  initialValues?: Row;
+  hiddenFields?: string[];
 }) {
   const { request: api } = useApi();
+  const managedSharePoint = entity.name === 'documents' && row?.storage_provider === 'sharepoint';
   const {
     formRef,
     fieldErrors,
@@ -35,6 +41,7 @@ export default function RecordForm({
       entity.fields.map((f) => [
         f.name,
         row?.[f.name] ??
+          initialValues[f.name] ??
           (f.type === 'boolean'
             ? f.name === 'active'
             : f.name === 'currency'
@@ -48,6 +55,14 @@ export default function RecordForm({
   const [refs, setRefs] = useState<Record<string, Row[]>>({}),
     [busy, setBusy] = useState(false),
     [lookup, setLookup] = useState<Record<string, { page: number; total: number }>>({});
+  useVisibleViewData('Eingabemaske: ' + entity.name, {
+    entity: entity.name,
+    objectId: row?.objectId,
+    unsaved: true,
+    values,
+    fieldErrors,
+    error,
+  });
   async function loadRef(name: string, page = 1) {
     const r = await api(`/data/${name}?limit=100&page=${page}`);
     setRefs((old) => ({ ...old, [name]: page === 1 ? r.rows : [...(old[name] || []), ...r.rows] }));
@@ -55,7 +70,16 @@ export default function RecordForm({
   }
   useEffect(() => {
     Promise.all(
-      [...new Set(entity.fields.map((f) => f.reference).filter(Boolean))].map((r) => loadRef(r!))
+      [
+        ...new Set(
+          entity.fields
+            .filter(
+              (f) => !hiddenFields.includes(f.name) && entities.some((e) => e.name === f.reference)
+            )
+            .map((f) => f.reference)
+            .filter(Boolean)
+        ),
+      ].map((r) => loadRef(r!))
     ).catch((e) => setError(e.message));
   }, [entity.name]);
   return (
@@ -85,7 +109,7 @@ export default function RecordForm({
             setError('');
             const payload: Row = {};
             for (const f of entity.fields) {
-              if (f.readonly) continue;
+              if (f.readonly || (managedSharePoint && f.name === 'url')) continue;
               const v = values[f.name];
               if (row && f.name === 'password' && !v) continue;
               if (row && v === row[f.name]) continue;
@@ -110,7 +134,12 @@ export default function RecordForm({
         >
           <div className="form-fields">
             {entity.fields
-              .filter((f) => !f.readonly)
+              .filter(
+                (f) =>
+                  !f.readonly &&
+                  !hiddenFields.includes(f.name) &&
+                  !(managedSharePoint && f.name === 'url')
+              )
               .map((f) => (
                 <label key={f.name}>
                   {label(f.name)}

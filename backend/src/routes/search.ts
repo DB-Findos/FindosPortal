@@ -8,8 +8,10 @@ import {
   createRecord,
   updateRecord,
   archiveRecord,
+  publicRow,
 } from '../repositories/entities.js';
 import { httpError } from '../shared/errors.js';
+import { entityName } from '../entities.js';
 
 export const searchRouter = Router();
 searchRouter.use(authenticate);
@@ -19,10 +21,15 @@ searchRouter.post('/query', async (req, res) => {
       definition: searchDefinition,
       page: z.number().int().min(1).max(100000).default(1),
       limit: z.number().int().min(1).max(100).default(50),
+      root_records: z.boolean().default(false),
     })
     .strict()
     .parse(req.body);
-  const compiled = compileSearch(input.definition, await permissions(req.userId!));
+  const rootEntity = entityName(input.definition.entity);
+  const compiled = compileSearch(input.definition, await permissions(req.userId!), {
+    rootRows: input.root_records,
+    includeRecordRefs: !input.root_records,
+  });
   const client = await pool.connect();
   try {
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
@@ -36,7 +43,10 @@ searchRouter.post('/query', async (req, res) => {
     await client.query('COMMIT');
     res.json({
       columns: compiled.columns,
-      rows: result.rows,
+      rows: input.root_records
+        ? result.rows.map((row) => publicRow(rootEntity, row))
+        : result.rows.map(({ __record_refs, ...row }) => row),
+      recordRefs: input.root_records ? undefined : result.rows.map((row) => row.__record_refs),
       total: count.rows[0].total,
       page: input.page,
       limit: input.limit,

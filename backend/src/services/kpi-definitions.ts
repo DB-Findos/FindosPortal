@@ -17,7 +17,7 @@ export function permit(rights: Rights, entity: string, action = 'read') {
     throw httpError(403, `Keine ${action}-Berechtigung für ${entity}.`);
 }
 export function numericSources(rights: Rights) {
-  const companyContextEntities = new Set(['companies', 'funds', 'deal_data']);
+  const companyContextEntities = new Set(['companies', 'funds', 'deal_data', 'capital_movements']);
   return Object.entries(definitions).flatMap(([entity, def]) => {
     const numeric = fields(entity as Entity).filter((f) => f.type === 'number');
     return rights[entity]?.can_read && numeric.length && companyContextEntities.has(entity)
@@ -27,6 +27,7 @@ export function numericSources(rights: Rights) {
             label: def.label,
             fields: numeric.map((f) => f.name),
             filterFields: Object.keys(def.schema.shape),
+            aggregation: entity === 'capital_movements' ? 'CUMULATIVE' : 'FIXED',
           },
         ]
       : [];
@@ -108,9 +109,31 @@ export async function prepareFormula(
       ).rows[0];
       if (!metric) throw invalid('Diese Metric Number existiert nicht.');
       name = `MetricData:${metric.name} [${v.metric_number}] · ${v.aggregation}${v.prior_year ? ' · V12P' : ''}${v.dimension ? ' · ' + v.dimension : ''}`;
+    } else if (v.aggregation === 'CUMULATIVE') {
+      permit(rights, 'companies');
+      if (
+        v.entity !== 'capital_movements' ||
+        v.field !== 'value' ||
+        v.metric_number !== null ||
+        v.record_id ||
+        v.target_kpi_id ||
+        v.prior_year ||
+        v.dimension
+      )
+        throw invalid('Eine Stichtagssumme benötigt CapitalMovements:value im Company-Kontext.');
+      if (
+        v.filter &&
+        (v.filter.operator !== 'equals' ||
+          !['type', 'reason'].includes(v.filter.field) ||
+          !v.filter.value?.trim())
+      )
+        throw invalid(
+          'CapitalMovements kann nach type oder reason auf einen exakten Wert gefiltert werden.'
+        );
+      name = `CapitalMovements:value · Summe bis einschließlich Berichtsmonat${v.filter ? ` · ${v.filter.field}=${v.filter.value}` : ''}`;
     } else if (v.aggregation === 'FIXED') {
       if (
-        v.entity === 'metric_data' ||
+        ['metric_data', 'capital_movements'].includes(v.entity) ||
         !numericSources(rights)
           .find((s) => s.entity === v.entity)
           ?.fields.includes(v.field) ||

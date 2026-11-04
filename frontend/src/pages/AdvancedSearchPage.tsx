@@ -5,13 +5,19 @@ import SearchFieldPicker from '../components/search/SearchFieldPicker';
 import SearchFilters from '../components/search/SearchFilters';
 import SearchResults from '../components/search/SearchResults';
 import SavedSearchViews from '../components/search/SavedSearchViews';
+import RecordForm from '../components/data/RecordForm';
+import { editableSearchEntity } from '../components/search/SearchRecordActions';
+import type { Entity, Row } from '../types/api';
+import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useApi } from '../contexts/ApiContext';
+import { useVisibleViewData } from '../contexts/ViewContentContext';
 import {
   availableFields,
   getSources,
   type SearchDefinition,
   type SearchResult,
+  type SearchRecordRef,
 } from '../types/search';
 const initial = (entity: string): SearchDefinition => ({
   entity,
@@ -24,7 +30,8 @@ const initial = (entity: string): SearchDefinition => ({
   order: [],
 });
 export default function AdvancedSearchPage() {
-  const { entities } = useAuth();
+  const { entities, refresh } = useAuth();
+  const theme = useTheme();
   const { request } = useApi();
   const [definition, setDefinition] = useState<SearchDefinition>(() =>
     initial(
@@ -34,11 +41,18 @@ export default function AdvancedSearchPage() {
   const [result, setResult] = useState<SearchResult | null>(null),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<{ entity: Entity; row: Row } | null>(null);
+  const [openingEdit, setOpeningEdit] = useState(false);
+  const editRevision = useRef(0);
   const revision = useRef(0),
     requestId = useRef(0);
   const sources = getSources(definition, entities);
+  useVisibleViewData('Advanced Search', { definition, result, busy, error });
   const change = (next: SearchDefinition) => {
     revision.current++;
+    editRevision.current++;
+    setEditing(null);
+    setOpeningEdit(false);
     setDefinition(next);
     setResult(null);
     setError('');
@@ -54,11 +68,33 @@ export default function AdvancedSearchPage() {
         page,
         limit: 50,
       });
-      if (version === revision.current && id === requestId.current) setResult(data);
+      if (version === revision.current && id === requestId.current) {
+        const lastPage = Math.max(1, Math.ceil(data.total / data.limit));
+        if (page > lastPage) {
+          await run(lastPage);
+          return;
+        }
+        setResult(data);
+      }
     } catch (e) {
       if (version === revision.current) setError((e as Error).message);
     } finally {
       if (id === requestId.current) setBusy(false);
+    }
+  }
+  async function edit(record: SearchRecordRef) {
+    const entity = entities.find((item) => item.name === record.entity);
+    if (!entity || !editableSearchEntity(entity)) return;
+    const selection = ++editRevision.current;
+    setOpeningEdit(true);
+    setError('');
+    try {
+      const row = await request<Row>(`/data/${record.entity}/${record.objectId}`);
+      if (selection === editRevision.current) setEditing({ entity, row });
+    } catch (cause) {
+      if (selection === editRevision.current) setError((cause as Error).message);
+    } finally {
+      if (selection === editRevision.current) setOpeningEdit(false);
     }
   }
   return (
@@ -128,9 +164,31 @@ export default function AdvancedSearchPage() {
               {error}
             </div>
           )}
-          <SearchResults result={result} busy={busy} onPage={(page) => void run(page)} />
+          <SearchResults
+            result={result}
+            busy={busy}
+            entities={entities}
+            editingBusy={openingEdit}
+            onEdit={(record) => void edit(record)}
+            onPage={(page) => void run(page)}
+          />
         </div>
       </div>
+      {editing && (
+        <RecordForm
+          key={`${editing.entity.name}:${editing.row.id}`}
+          entity={editing.entity}
+          row={editing.row}
+          entities={entities}
+          onClose={() => setEditing(null)}
+          onSave={() => {
+            if (['images', 'design_settings'].includes(editing.entity.name)) void theme.refresh();
+            setEditing(null);
+            void refresh();
+            void run(result?.page ?? 1);
+          }}
+        />
+      )}
     </>
   );
 }

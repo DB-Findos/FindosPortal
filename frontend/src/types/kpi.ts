@@ -2,7 +2,7 @@ export interface KpiVariable {
   identifier: string;
   entity: string;
   field: string;
-  aggregation: 'MONTH' | 'LTM' | 'YTD' | 'FIXED' | 'KPI';
+  aggregation: 'MONTH' | 'LTM' | 'YTD' | 'FIXED' | 'KPI' | 'CUMULATIVE';
   prior_year: boolean;
   dimension: string | null;
   metric_number: number | null;
@@ -34,7 +34,13 @@ export interface Report {
 export interface KpiCatalog {
   metrics: { metric_number: number; name: string }[];
   companies: { objectId: string; name: string; currency?: string }[];
-  sources: { entity: string; label: string; fields: string[]; filterFields: string[] }[];
+  sources: {
+    entity: string;
+    label: string;
+    fields: string[];
+    filterFields: string[];
+    aggregation?: string;
+  }[];
 }
 export interface ReportContext {
   company_id: string;

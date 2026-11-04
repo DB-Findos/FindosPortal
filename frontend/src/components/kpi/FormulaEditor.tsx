@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApi } from '../../contexts/ApiContext';
+import { useVisibleViewData } from '../../contexts/ViewContentContext';
 import { useFormErrors } from '../../hooks/useFormErrors';
 import FieldError from '../common/FieldError';
 import FormulaCanvas from './FormulaCanvas';
@@ -122,6 +123,17 @@ export default function FormulaEditor({
       setBusy(false);
     }
   }
+  useVisibleViewData('KPI-Formeleditor', {
+    savedId: initial?.objectId,
+    unsaved: true,
+    formula: input(),
+    context,
+    preview,
+    selectedVariable: editingVariable,
+    validation: validated,
+    busy,
+    errors: errors.fieldErrors,
+  });
   function err(field: string) {
     return <FieldError id={errors.errorId(field)} message={errors.fieldErrors[field]} />;
   }

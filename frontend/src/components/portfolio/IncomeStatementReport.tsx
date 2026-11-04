@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { useApi } from '../../contexts/ApiContext';
 import IncomeWaterfall from './IncomeWaterfall';
 import MetricHistoryChart, { type MetricHistory } from './MetricHistoryChart';
-import { useReportContext } from '../../hooks/useReportContext';
+import type { FinancialContext } from './FinancialsReport';
+import { useVisibleViewData } from '../../contexts/ViewContentContext';
 import './PerformanceUpdateReport.css';
 import './IncomeStatementReport.css';
 
@@ -28,12 +29,16 @@ type Report = {
   warnings: string[];
   history: MetricHistory[];
 };
-export default function IncomeStatementReport({ companyId }: { companyId: string }) {
+export default function IncomeStatementReport({
+  companyId,
+  date,
+  currency,
+  aggregation,
+  dimension,
+  onDateResolved,
+}: FinancialContext & { onDateResolved: (date: string) => void }) {
   const { request } = useApi();
-  const { date, setDate, currency, setCurrency } = useReportContext(companyId);
   const [selectedMetric, setSelectedMetric] = useState({ companyId, metricId: '' });
-  const [aggregation, setAggregation] = useState('MONTH');
-  const [dimension, setDimension] = useState('actual');
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -46,7 +51,10 @@ export default function IncomeStatementReport({ companyId }: { companyId: string
     if (date) query.set('date', date);
     request<Report>(`/portfolio/companies/${companyId}/income-statement?${query}`)
       .then((data) => {
-        if (active) setReport(data);
+        if (active) {
+          setReport(data);
+          onDateResolved(data.date);
+        }
       })
       .catch((cause: Error) => {
         if (active) setError(cause.message);
@@ -57,7 +65,7 @@ export default function IncomeStatementReport({ companyId }: { companyId: string
     return () => {
       active = false;
     };
-  }, [companyId, date, currency, aggregation, dimension, request]);
+  }, [companyId, date, currency, aggregation, dimension, request, onDateResolved]);
 
   const currentReport =
     report?.company.objectId === companyId &&
@@ -74,53 +82,23 @@ export default function IncomeStatementReport({ companyId }: { companyId: string
     currentReport?.history.find((item) => item.metricNumber === 1000000) ??
     currentReport?.history[0];
 
+  useVisibleViewData('Income Statement', {
+    companyId,
+    date: date || currentReport?.date,
+    currency,
+    aggregation,
+    dimension,
+    loading,
+    error,
+    selectedMetric: selectedHistory?.metricNumber,
+    report: currentReport,
+    visualizations: [
+      'Revenue-to-Net-Income-Wasserfall',
+      '18-Monats-Verlauf: Monatsbalken und Running-LTM-Linie',
+    ],
+  });
   return (
     <section className="income-statement" aria-label="Income Statement">
-      <div className="performance-toolbar income-toolbar">
-        <div className="performance-heading">
-          <h2>Revenue to Net Income</h2>
-        </div>
-        <div className="performance-pickers income-pickers">
-          <label>
-            <span>Stichtag</span>
-            <span className="performance-input-wrap">
-              <CalendarDays size={15} />
-              <input
-                type="month"
-                value={date || currentReport?.date || ''}
-                onChange={(event) => setDate(event.target.value)}
-              />
-            </span>
-          </label>
-          <label>
-            <span>Zeitraum</span>
-            <select value={aggregation} onChange={(event) => setAggregation(event.target.value)}>
-              <option value="MONTH">Monat</option>
-              <option value="YTD">YTD</option>
-              <option value="LTM">LTM</option>
-            </select>
-          </label>
-          <label>
-            <span>Dimension</span>
-            <select value={dimension} onChange={(event) => setDimension(event.target.value)}>
-              <option value="actual">Actual</option>
-              <option value="budget">Budget</option>
-              <option value="plan">Findos Plan</option>
-              <option value="forecast">Forecast</option>
-            </select>
-          </label>
-          <label>
-            <span>Währung</span>
-            <select
-              value={currency}
-              onChange={(event) => setCurrency(event.target.value as 'CC' | 'EUR')}
-            >
-              <option value="CC">CC · Company Currency</option>
-              <option value="EUR">EUR · Euro</option>
-            </select>
-          </label>
-        </div>
-      </div>
       {error && (
         <div className="performance-message error" role="alert">
           {error}

@@ -1,10 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { portalInstructions, portalTools, executeTool, toolError } from './tools.js';
-import { catalog, type Actor } from './data.js';
+import type { Actor } from './data.js';
+import { inspectDataModel } from './research.js';
 
 export function createMcpServer(actor: Actor) {
   const server = new McpServer(
-    { name: 'findos-portal', version: '1.0.0' },
+    { name: 'findos-portal', version: '1.1.0' },
     { instructions: portalInstructions }
   );
   for (const tool of portalTools.filter((tool) => !tool.writes || actor.canCommit)) {
@@ -35,10 +36,18 @@ export function createMcpServer(actor: Actor) {
   server.registerResource(
     'data-model',
     'findos://data-model',
-    { description: 'Accessible application entities and references', mimeType: 'application/json' },
+    {
+      description:
+        'Complete authorized entity/field/reference map, domain rules and query examples',
+      mimeType: 'application/json',
+    },
     async (uri) => ({
       contents: [
-        { uri: uri.href, mimeType: 'application/json', text: JSON.stringify(catalog(actor)) },
+        {
+          uri: uri.href,
+          mimeType: 'application/json',
+          text: JSON.stringify(await inspectDataModel(actor)),
+        },
       ],
     })
   );

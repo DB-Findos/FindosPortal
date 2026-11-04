@@ -2,11 +2,163 @@ import { z } from 'zod';
 import { imageInput } from './services/images.js';
 import { variableInput } from './services/kpi-schema.js';
 import { chatDefinitions } from './services/chat-schema.js';
+import { applicationDefinition } from './services/application-schema.js';
+import { documentDefinitions } from './services/document-schema.js';
 const text = z.string().trim().min(1).max(500);
 const optional = z.string().trim().max(2000).nullable().optional();
 const uuid = z.uuid();
 export const definitions = {
   ...chatDefinitions,
+  ...documentDefinitions,
+  application_modules: applicationDefinition,
+  knowledge_spaces: {
+    label: 'Knowledge Spaces',
+    readonly: true,
+    schema: z.object({
+      name: text,
+      description: z.string(),
+      position: z.number().int(),
+      source_key: z.string().nullable(),
+    }),
+    refs: {},
+  },
+  knowledge_sections: {
+    label: 'Knowledge Sections',
+    readonly: true,
+    schema: z.object({
+      space_id: uuid,
+      name: text,
+      position: z.number().int(),
+      source_key: z.string().nullable(),
+    }),
+    refs: { space_id: 'knowledge_spaces' },
+  },
+  knowledge_entries: {
+    label: 'Knowledge Entries',
+    readonly: true,
+    schema: z.object({
+      section_id: uuid,
+      parent_id: uuid.nullable(),
+      title: text,
+      type: z.string(),
+      content_html: z.string(),
+      plain_text: z.string(),
+      tags: z.array(z.string()),
+      responsible_id: uuid,
+      upToDate: z.boolean(),
+      reviewCycleMonths: z.number().int(),
+      reviewedAt: z.string().nullable(),
+      reviewedBy: uuid.nullable(),
+      reviewDueAt: z.string().nullable(),
+      position: z.number().int(),
+      source_key: z.string().nullable(),
+      source_url: z.string().nullable(),
+      source_modified_at: z.string().nullable(),
+    }),
+    refs: {
+      section_id: 'knowledge_sections',
+      parent_id: 'knowledge_entries',
+      responsible_id: 'users',
+      reviewedBy: 'users',
+    },
+  },
+  knowledge_documents: {
+    label: 'Knowledge Templates',
+    readonly: true,
+    schema: z.object({
+      entry_id: uuid,
+      name: text,
+      kind: z.literal('template'),
+      extension: z.string(),
+      mime_type: z.string(),
+      size_bytes: z.number(),
+      sha256: z.string(),
+      url: z.string(),
+      drive_id: z.string(),
+      item_id: z.string(),
+      uploaded_at: z.string(),
+      storage_path: z.string(),
+    }),
+    refs: { entry_id: 'knowledge_entries' },
+  },
+  custom_reports: {
+    label: 'CustomReport',
+    readonly: true,
+    schema: z.object({
+      owner_id: uuid,
+      name: text,
+      description: z.string(),
+      html: z.string(),
+      mapping: z.array(z.unknown()),
+      engine_version: z.number().int(),
+    }),
+    refs: { owner_id: 'users' },
+  },
+  custom_report_shares: {
+    label: 'CustomReport Shares',
+    readonly: true,
+    schema: z.object({ report_id: uuid, user_id: uuid.nullable(), group_id: uuid.nullable() }),
+    refs: { report_id: 'custom_reports', user_id: 'users', group_id: 'user_groups' },
+  },
+  comments: {
+    label: 'Comment',
+    schema: z.object({
+      company_id: uuid.nullable(),
+      company_source_name: z.string().nullable().optional(),
+      period: z.iso.date(),
+      type: z.string().trim().min(1).max(200).default('Investoren Reporting'),
+      comment_text: z.string().max(100000).nullable(),
+      source_id: uuid.nullable().optional(),
+      source_file: z.string().nullable().optional(),
+      source_row: z.number().int().nullable().optional(),
+      mapping_note: z.string().nullable().optional(),
+      source_data: z.record(z.string(), z.unknown()).default({}),
+    }),
+    refs: { company_id: 'companies' },
+  },
+  kpi_data: {
+    label: 'KPIData',
+    readonly: true,
+    schema: z.object({
+      kpi_id: uuid,
+      formula_version_id: uuid,
+      company_id: uuid,
+      name: text,
+      period: z.iso.date(),
+      value: z.coerce.number().finite().nullable(),
+      dimension: z.enum(['actual', 'budget', 'forecast', 'plan']),
+      currency_mode: z.enum(['CC', 'EUR']),
+      currency: z.string(),
+      unit: z.string(),
+      status: z.enum(['ok', 'missing', 'error']),
+      message: z.string().nullable(),
+      source_revision: z.coerce.number().int(),
+      calculated_at: z.string(),
+    }),
+    refs: { kpi_id: 'kpi_formulas', company_id: 'companies' },
+  },
+  capital_movements: {
+    label: 'CapitalMovements',
+    schema: z.object({
+      name: text,
+      company_id: uuid.nullable(),
+      company_source_name: text,
+      movement_date: z.iso.date().nullable(),
+      source_date: z.iso.date().nullable().optional(),
+      date_source: z.string().default('manual'),
+      value: z.coerce.number().finite(),
+      currency: z
+        .string()
+        .regex(/^[A-Z]{3}$/)
+        .default('EUR'),
+      type: z.enum(['Capital Call', 'Capital Return']),
+      reason: optional,
+      source_file: optional,
+      source_row: z.number().int().nullable().optional(),
+      source_data: z.record(z.string(), z.unknown()).default({}),
+    }),
+    refs: { company_id: 'companies' },
+  },
   metric_formulas: {
     label: 'MetricFormulas',
     schema: z.object({
@@ -131,6 +283,16 @@ export const definitions = {
       name: text,
       internal_name: optional,
       industry: optional,
+      address_line: optional,
+      postal_code: optional,
+      city: optional,
+      country: optional,
+      phone: optional,
+      email: z
+        .union([z.email(), z.literal('')])
+        .nullable()
+        .optional(),
+      description: optional,
       website: z
         .union([z.url(), z.literal('')])
         .nullable()
@@ -143,6 +305,17 @@ export const definitions = {
       status: optional,
     }),
     refs: { fund_id: 'funds' },
+  },
+  company_contacts: {
+    label: 'Unternehmensverknüpfungen',
+    schema: z.object({
+      company_id: uuid,
+      contact_id: uuid,
+      category: z.enum(['company', 'findos']),
+      role: text,
+      notes: optional,
+    }),
+    refs: { company_id: 'companies', contact_id: 'contacts' },
   },
   metrics: {
     label: 'Metric',
@@ -159,6 +332,7 @@ export const definitions = {
       section: optional,
       important: z.boolean().default(false),
       description: optional,
+      source_data: z.record(z.string(), z.unknown()).nullable().optional(),
     }),
     refs: { company_id: 'companies' },
   },
@@ -176,6 +350,7 @@ export const definitions = {
       period: z.iso.date(),
       value: z.coerce.number().finite().nullable(),
       dimension: z.enum(['actual', 'budget', 'forecast', 'plan']).default('actual'),
+      source_data: z.record(z.string(), z.unknown()).nullable().optional(),
     }),
     refs: { metric_id: 'metrics', company_id: 'companies' },
   },
@@ -316,48 +491,61 @@ export function entityName(value: string): Entity {
 export function fields(entity: Entity) {
   return Object.entries(definitions[entity].schema.shape).map(([name, schema]) => ({
     name,
-    readonly: entity === 'metric_data' && ['company_id', 'name', 'currency'].includes(name),
+    readonly:
+      (entity === 'documents' && name === 'uploaded_at') ||
+      (entity === 'metric_data' && ['company_id', 'name', 'currency'].includes(name)) ||
+      (['metrics', 'metric_data', 'comments'].includes(entity) && name === 'source_data'),
     required: !schema.isOptional() && !(entity === 'metric_data' && name === 'value'),
     type: name.endsWith('_color')
       ? 'color'
-      : name === 'password'
-        ? 'password'
-        : name === 'email'
-          ? 'email'
-          : name === 'period' || name === 'as_of_date' || name === 'deal_date'
-            ? 'date'
-            : [
-                  'value',
-                  'metric_number',
-                  'index_value',
-                  'decimals',
-                  'position',
-                  'engine_version',
-                  'range_from',
-                  'range_to',
-                  'source_row',
-                  'findos_investment_value',
-                  'findos_investment_index_value',
-                  'revenue_ltm',
-                  'ebitda_ltm',
-                  'ebita_ltm',
-                  'multiple_ebitda',
-                  'multiple_ebita',
-                  'fixed_ev',
-                  'transaction_cost',
-                  'overfunding',
-                  'transaction_cost_other',
-                  'debt_financing',
-                  'findos_share',
-                  'purchase_price_total',
-                ].includes(name)
-              ? 'number'
-              : name === 'active' ||
-                  name === 'important' ||
-                  name === 'prior_year' ||
-                  name.startsWith('can_')
-                ? 'boolean'
-                : 'text',
+      : name === 'url'
+        ? 'url'
+        : name === 'password'
+          ? 'password'
+          : name === 'email'
+            ? 'email'
+            : name === 'period' ||
+                name === 'as_of_date' ||
+                name === 'deal_date' ||
+                name === 'movement_date' ||
+                name === 'source_date'
+              ? 'date'
+              : [
+                    'value',
+                    'size_bytes',
+                    'reviewCycleMonths',
+                    'source_revision',
+                    'metric_number',
+                    'index_value',
+                    'decimals',
+                    'position',
+                    'engine_version',
+                    'range_from',
+                    'range_to',
+                    'source_row',
+                    'findos_investment_value',
+                    'findos_investment_index_value',
+                    'revenue_ltm',
+                    'ebitda_ltm',
+                    'ebita_ltm',
+                    'multiple_ebitda',
+                    'multiple_ebita',
+                    'fixed_ev',
+                    'transaction_cost',
+                    'overfunding',
+                    'transaction_cost_other',
+                    'debt_financing',
+                    'findos_share',
+                    'purchase_price_total',
+                  ].includes(name)
+                ? 'number'
+                : name === 'upToDate' ||
+                    name === 'active' ||
+                    name === 'important' ||
+                    name === 'prior_year' ||
+                    name.startsWith('can_')
+                  ? 'boolean'
+                  : 'text',
     reference: (definitions[entity].refs as Record<string, string>)[name] || null,
     options: name === 'dimension' ? ['actual', 'budget', 'forecast', 'plan'] : null,
   }));

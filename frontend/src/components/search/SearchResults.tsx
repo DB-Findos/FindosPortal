@@ -2,16 +2,24 @@ import { useState } from 'react';
 import { Pin } from 'lucide-react';
 import { usePinnedColumns } from '../../hooks/usePinnedColumns';
 import ColumnContextMenu from '../data/ColumnContextMenu';
-import type { SearchResult } from '../../types/search';
+import type { SearchResult, SearchRecordRef } from '../../types/search';
+import type { Entity } from '../../types/api';
+import SearchRecordActions from './SearchRecordActions';
 import { label } from '../../utils/labels';
 export default function SearchResults({
   result,
   busy,
   onPage,
+  onEdit,
+  entities,
+  editingBusy = false,
 }: {
   result: SearchResult | null;
   busy: boolean;
   onPage: (page: number) => void;
+  onEdit: (record: SearchRecordRef) => void;
+  entities: Entity[];
+  editingBusy?: boolean;
 }) {
   const pinned = usePinnedColumns(result?.columns || [], 'advanced-search');
   const [menu, setMenu] = useState<{ column: string; x: number; y: number } | null>(null);
@@ -50,6 +58,7 @@ export default function SearchResults({
                   {pinned.isPinned(column) && <Pin size={11} />}
                 </th>
               ))}
+              {result && <th className="actions">Aktionen</th>}
             </tr>
           </thead>
           <tbody>
@@ -73,6 +82,14 @@ export default function SearchResults({
                           : String(row[column] ?? '')}
                   </td>
                 ))}
+                <td className="actions">
+                  <SearchRecordActions
+                    records={result.recordRefs?.[index] ?? {}}
+                    entities={entities}
+                    busy={busy || editingBusy}
+                    onEdit={onEdit}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>

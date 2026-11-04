@@ -2,6 +2,8 @@ import type { ErrorRequestHandler } from 'express';
 import { ZodError } from 'zod';
 import { databaseFieldErrors, validationFieldErrors } from '../shared/validation.js';
 export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
+  if (error.publicMessage === true && [502, 503].includes(error.status))
+    return void res.status(error.status).json({ error: error.message });
   if (
     [
       'ETIMEDOUT',

@@ -8,6 +8,8 @@ import { commitChange } from '../mcp/changes.js';
 import jwt from 'jsonwebtoken';
 import { jwtSecret } from '../config.js';
 import type { Actor } from '../mcp/data.js';
+import type { ChatViewContext } from './chat-context.js';
+import type { ChatProgress } from './chat-progress.js';
 
 export async function ownConversation(
   db: DatabaseClient,
@@ -81,6 +83,7 @@ export async function beginMessage(
     document_ids: string[];
     model: string;
     reasoning_effort: string;
+    context?: ChatViewContext;
   }
 ) {
   return transaction(userId, async (db) => {
@@ -112,7 +115,41 @@ export async function beginMessage(
       model: input.model,
       reasoning_effort: input.reasoning_effort,
       status: 'complete',
-      metadata: {},
+      metadata: input.context
+        ? {
+            view_context: {
+              path: input.context.path,
+              view: input.context.view,
+              entity: input.context.entity,
+              capturedAt: input.context.content?.capturedAt,
+              controls: input.context.content?.controls.slice(0, 100).map((control) => ({
+                label: control.label.slice(0, 200),
+                value: control.value.slice(0, 500),
+              })),
+              selections: input.context.content?.sources.map((source) => ({
+                name: source.name,
+                state: Object.fromEntries(
+                  Object.entries(
+                    (source.data && typeof source.data === 'object' ? source.data : {}) as Record<
+                      string,
+                      unknown
+                    >
+                  ).filter(([key]) =>
+                    [
+                      'companyId',
+                      'date',
+                      'currency',
+                      'dimension',
+                      'aggregation',
+                      'selectedMetric',
+                      'selectedEffects',
+                    ].includes(key)
+                  )
+                ),
+              })),
+            },
+          }
+        : {},
     });
     for (const documentId of input.document_ids)
       await createRecord(db, 'chat_message_files', {
@@ -132,7 +169,14 @@ export async function finishMessage(
   conversationId: string,
   questionId: string,
   content: string,
-  metadata: { changes?: ChangeProposal[]; steps?: string[]; document_ids?: string[] },
+  metadata: {
+    changes?: ChangeProposal[];
+    steps?: string[];
+    document_ids?: string[];
+    progress?: ChatProgress[];
+    review?: { status: string; model: string; passes: number };
+    orchestration?: import('./ai/orchestration/types.js').ChatResult['orchestration'];
+  },
   status = 'complete'
 ) {
   return transaction(userId, async (db) => {
@@ -179,6 +223,10 @@ export function modelHistory(messages: Record<string, any>[]) {
     role: message.role as 'user' | 'assistant',
     content:
       message.content +
+      (message.metadata?.view_context
+        ? '\nAnsicht beim Senden dieser Nachricht (Datenkontext): ' +
+          JSON.stringify(historyViewContext(message))
+        : '') +
       (message.files?.length
         ? '\nDokumentreferenzen (über read_document abrufbar): ' +
           JSON.stringify(
@@ -190,13 +238,41 @@ export function modelHistory(messages: Record<string, any>[]) {
           JSON.stringify(
             message.metadata.changes.map(
               ({ token: _, ...preview }: ChangeProposal, index: number) => ({
-                ...preview,
+                title: preview.title,
+                entity: preview.entity,
+                operation: preview.operation,
                 committed: message.metadata.committed_indices?.includes(index) || false,
               })
             )
           )
         : ''),
   }));
+}
+
+function historyViewContext(message: Record<string, any>) {
+  const view = message.metadata.view_context;
+  return {
+    path: view.path,
+    view: view.view,
+    entity: view.entity,
+    title: view.content?.title,
+    capturedAt: view.content?.capturedAt,
+    controls: view.content?.controls
+      ?.slice(0, 30)
+      .map((control: { label: string; value: string }) => ({
+        label: control.label,
+        value: String(control.value ?? '').slice(0, 500),
+      })),
+    sources: view.content?.sources?.map((source: { name: string; data: unknown }) => ({
+      name: source.name,
+      fields:
+        source.data && typeof source.data === 'object' ? Object.keys(source.data).slice(0, 30) : [],
+    })),
+    textPreview: view.content?.text?.slice(0, 1500),
+    conversation_id: message.conversation_id,
+    message_id: message.objectId,
+    note: 'Historischer Ansichtssnapshot kompakt; vollständiger Snapshot und Vorschläge mit read_conversation(include_context=true) abrufbar. Aktuelle Ansicht wird separat vollständig mitgesendet.',
+  };
 }
 
 export async function commitStoredChange(actor: Actor, messageId: string, index: number) {

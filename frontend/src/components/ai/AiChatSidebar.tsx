@@ -5,7 +5,14 @@ import { useChat } from '../../hooks/useChat';
 import ChatControls from './ChatControls';
 import ChatMessageItem from './ChatMessageItem';
 import ChatComposer from './ChatComposer';
+import ChatActivity from './ChatActivity';
 function viewContext(path: string) {
+  if (path.startsWith('/knowledge'))
+    return { view: 'Knowledge Management', entity: 'knowledge_entries' };
+  if (path.includes('/portfolio/')) return { view: 'Portfolio Reporting', entity: null };
+  if (path === '/') return { view: 'Anwendungsübersicht', entity: null };
+  if (path.includes('/settings/applications'))
+    return { view: 'Anwendungen & Links', entity: 'application_modules' };
   if (path.includes('/settings/kpis'))
     return { view: 'KPI Formula Editor & Reporting', entity: null };
   if (path.includes('/settings/data/'))
@@ -23,8 +30,8 @@ export default function AiChatSidebar() {
   const scroll = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
   const context = useMemo(
-    () => ({ path: location.pathname, ...viewContext(location.pathname) }),
-    [location.pathname]
+    () => ({ path: location.pathname + location.search, ...viewContext(location.pathname) }),
+    [location.pathname, location.search]
   );
   const chat = useChat(open, context);
   useEffect(() => {
@@ -33,7 +40,7 @@ export default function AiChatSidebar() {
   useEffect(() => {
     if (scroll.current && nearBottom.current)
       scroll.current.scrollTop = scroll.current.scrollHeight;
-  }, [chat.messages, chat.busy, open]);
+  }, [chat.messages, chat.busy, chat.generation?.progress.length, open]);
   if (!open)
     return (
       <button className="ai-chat-toggle" onClick={() => setOpen(true)} aria-label="KI-Chat öffnen">
@@ -127,12 +134,16 @@ export default function AiChatSidebar() {
             onCommit={chat.commit}
           />
         ))}
-        {chat.busy && (
-          <div className="ai-thinking" role="status">
-            <Sparkles size={16} />
-            <span>Wird verarbeitet</span>
-            <span className="ai-thinking-dots">•••</span>
-          </div>
+        {chat.generation ? (
+          <ChatActivity progress={chat.generation.progress} startedAt={chat.generation.startedAt} />
+        ) : (
+          chat.busy && (
+            <div className="ai-thinking" role="status">
+              <Sparkles size={16} />
+              <span>Wird verarbeitet</span>
+              <span className="ai-thinking-dots">•••</span>
+            </div>
+          )
         )}
       </div>
       {chat.error && (
@@ -144,7 +155,9 @@ export default function AiChatSidebar() {
         draft={chat.draft}
         files={chat.files}
         busy={chat.busy}
-        ready={!!chat.model}
+        ready={!!chat.model && chat.backendReady}
+        stopping={chat.stopping}
+        onStop={chat.generation && chat.canStop ? () => void chat.stop() : undefined}
         onDraft={chat.setDraft}
         onFiles={chat.setFiles}
         onError={chat.setError}

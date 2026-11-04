@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LogOut, Settings } from 'lucide-react';
+import { LayoutGrid, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Brand from './Brand';
 export default function Topbar() {
@@ -22,6 +22,14 @@ export default function Topbar() {
             {user?.last_name?.[0]}
           </span>
           <span className="separator" />
+          <Link
+            to="/"
+            className={'icon ' + (location.pathname === '/' ? 'selected' : '')}
+            aria-label="Anwendungsübersicht"
+            title="Anwendungen"
+          >
+            <LayoutGrid size={20} />
+          </Link>
           <Link
             className={'icon ' + (location.pathname.startsWith('/settings') ? 'selected' : '')}
             aria-label="Einstellungen"

@@ -47,6 +47,15 @@ Historie dokumentiert Formel-/Mappingänderungen. Sie ist kein eingefrorener his
 
 ## Standardbericht und Betrieb
 
+CapitalMovements unterstützt zusätzlich `CUMULATIVE` (Entity-Feld · Summe bis
+Stichtag). Dabei werden `value`-Beträge der Berichts-Company bis einschließlich des
+gewählten Monats über alle Jahre summiert. Ein optionaler exakter Filter auf
+`type` oder `reason` wird in VariableMap gespeichert. Kein passender Eintrag
+ergibt 0; undatierte passende Einträge werden mit Hinweis ausgeschlossen.
+CapitalMovements.value und DealData.findos_investment_value verwenden Tausend EUR.
+Der Investment-Wert ist bereits EUR, unabhängig von der Company-Währung; RCV
+(Metric 4101200) ist dimensionslos. Siehe [Equity Bridge](equity-bridge.md).
+
 `backend/src/seed-reporting.ts` legt idempotent sieben Standard-KPIs und „Standardreporting · Performance“ an: Umsatz Monat/LTM/YTD/Vorjahresmonat, Umsatzwachstum, Adjusted EBITDA Monat und Adjusted EBITDA-Marge. Grundlage sind die vorhandenen Metric Numbers **1000000 (Revenue)** und **1300300 (Adjusted EBITDA)**. Bestehende gleichnamige Definitionen werden nicht überschrieben. Absolute Werte behalten die Einheit der Quelldaten; Anzeigeeinheiten bei Bedarf im Editor pflegen. Fehlende Metrics/Monate werden ausdrücklich angezeigt.
 
 ```powershell

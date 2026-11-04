@@ -3,6 +3,7 @@ import { CalendarDays, RefreshCw } from 'lucide-react';
 import { useApi } from '../../contexts/ApiContext';
 import PerformanceDataReport from './PerformanceDataReport';
 import { useReportContext } from '../../hooks/useReportContext';
+import { useVisibleViewData } from '../../contexts/ViewContentContext';
 import './PerformanceUpdateReport.css';
 
 type CurrencyMode = 'CC' | 'EUR';
@@ -59,6 +60,14 @@ export default function PerformanceUpdateReport({ companyId }: { companyId: stri
       : null;
 
   const effectiveDate = date || currentReport?.date || '';
+  useVisibleViewData('Performance Update', {
+    companyId,
+    date: effectiveDate,
+    currency,
+    loading,
+    error,
+    report: currentReport,
+  });
   const monthTitle = useMemo(
     () =>
       effectiveDate

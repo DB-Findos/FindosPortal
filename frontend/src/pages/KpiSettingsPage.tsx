@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useApi } from '../contexts/ApiContext';
+import { useVisibleViewData } from '../contexts/ViewContentContext';
 import { useAuth } from '../contexts/AuthContext';
 import PageHeading from '../components/common/PageHeading';
 import FormulaEditor from '../components/kpi/FormulaEditor';
 import ReportEditor from '../components/kpi/ReportEditor';
+import KpiCalculationControls from '../components/kpi/KpiCalculationControls';
 import type { Formula, KpiCatalog, Report } from '../types/kpi';
 export default function KpiSettingsPage() {
   const { request } = useApi(),
@@ -23,6 +25,20 @@ export default function KpiSettingsPage() {
     child = tab === 'formulas' ? 'variable_map' : 'report_items';
   const canCreate = Boolean(rights[entity]?.can_create && rights[child]?.can_create),
     canUpdate = Boolean(rights[entity]?.can_update && rights[child]?.can_update);
+  useVisibleViewData('KPI-Bibliothek', {
+    tab,
+    selected: editing?.objectId,
+    items: (tab === 'formulas' ? formulas : reports).map(
+      ({ objectId, name, description, ...row }) => ({
+        objectId,
+        name,
+        description,
+        ...('TextDisplay' in row ? { TextDisplay: row.TextDisplay } : {}),
+      })
+    ),
+    busy,
+    error,
+  });
   async function load() {
     try {
       const [f, r, c] = await Promise.all([
@@ -119,6 +135,9 @@ export default function KpiSettingsPage() {
         <p className="kpi-notice" role="status">
           {notice}
         </p>
+      )}
+      {tab === 'formulas' && (
+        <KpiCalculationControls formulaId={editing?.objectId} canRecalculate={canUpdate} />
       )}
       <div className="kpi-workspace">
         <aside className="kpi-library">

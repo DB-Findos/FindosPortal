@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApi } from '../../contexts/ApiContext';
+import { useVisibleViewData } from '../../contexts/ViewContentContext';
 import { useFormErrors } from '../../hooks/useFormErrors';
 import FieldError from '../common/FieldError';
 import type { Formula, Report } from '../../types/kpi';
@@ -22,6 +23,16 @@ export default function ReportEditor({
     [description, setDescription] = useState(initial?.description || ''),
     [ids, setIds] = useState<string[]>(initial?.kpi_ids || []),
     [busy, setBusy] = useState(false);
+  useVisibleViewData('Berichtseditor', {
+    objectId: initial?.objectId,
+    unsaved: true,
+    name,
+    description,
+    kpis: ids.map((objectId) => ({
+      objectId,
+      name: formulas.find((formula) => formula.objectId === objectId)?.name,
+    })),
+  });
   function move(index: number, direction: number) {
     const next = [...ids];
     [next[index], next[index + direction]] = [next[index + direction], next[index]];

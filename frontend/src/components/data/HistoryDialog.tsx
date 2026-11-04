@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useApi } from '../../contexts/ApiContext';
+import { useVisibleViewData } from '../../contexts/ViewContentContext';
 import type { Entity, Row } from '../../types/api';
 export default function HistoryDialog({
   entity,
@@ -14,6 +15,12 @@ export default function HistoryDialog({
   const { request } = useApi();
   const [versions, setVersions] = useState<Row[]>([]),
     [error, setError] = useState('');
+  useVisibleViewData('Versionshistorie: ' + entity.name, {
+    entity: entity.name,
+    objectId: row.objectId,
+    versions,
+    error,
+  });
   useEffect(() => {
     void request('/data/' + entity.name + '/' + row.objectId + '/history')
       .then((data) => setVersions(data.rows))

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ArrowUp, Paperclip, FileText, X } from 'lucide-react';
+import { ArrowUp, Paperclip, FileText, X, Square } from 'lucide-react';
 
 export default function ChatComposer({
   draft,
@@ -10,6 +10,8 @@ export default function ChatComposer({
   onFiles,
   onError,
   onSend,
+  onStop,
+  stopping = false,
 }: {
   draft: string;
   files: File[];
@@ -19,6 +21,8 @@ export default function ChatComposer({
   onFiles: (files: File[]) => void;
   onError: (error: string) => void;
   onSend: () => void;
+  onStop?: () => void;
+  stopping?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
@@ -101,14 +105,27 @@ export default function ChatComposer({
             <Paperclip size={19} />
           </button>
           <span>Shift + Enter für neue Zeile</span>
-          <button
-            type="submit"
-            className="ai-send"
-            disabled={!canSend}
-            aria-label="Nachricht senden"
-          >
-            <ArrowUp size={20} />
-          </button>
+          {busy && onStop ? (
+            <button
+              type="button"
+              className="ai-send ai-stop"
+              disabled={stopping}
+              onClick={onStop}
+              aria-label={stopping ? 'Abbruch wird ausgeführt' : 'Bearbeitung abbrechen'}
+              title="Bearbeitung abbrechen"
+            >
+              <Square size={15} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="ai-send"
+              disabled={!canSend}
+              aria-label="Nachricht senden"
+            >
+              <ArrowUp size={20} />
+            </button>
+          )}
         </div>
       </form>
       <small className="ai-composer-note">

@@ -2,6 +2,7 @@ import type { DatabaseClient as PoolClient } from '../database/connection.js';
 import { pool } from '../db.js';
 import { definitions, type Entity } from '../entities.js';
 import { httpError, fieldError } from '../shared/errors.js';
+import { sharedDocumentScope } from '../services/document-schema.js';
 
 export const current = '"archivedAt" IS NULL';
 export const auditColumns = [
@@ -16,6 +17,10 @@ export const auditColumns = [
 export function publicRow(entity: Entity, row: Record<string, any>) {
   const result = { ...row };
   delete result.password_hash;
+  if (entity === 'documents' && row.storage_provider === 'sharepoint' && row.objectId)
+    result.url = `/api/documents/${row.objectId}/download`;
+  if (entity === 'knowledge_documents' && row.entry_id && row.objectId)
+    result.url = `/api/knowledge/entries/${row.entry_id}/templates/${row.objectId}/download`;
   return result;
 }
 export async function transaction<T>(actor: string, work: (client: PoolClient) => Promise<T>) {
@@ -43,7 +48,7 @@ export async function activeRow(
   lock = false
 ) {
   const result = await client.query(
-    `SELECT * FROM portal.${entity} WHERE "objectId"=$1 AND ${current}${lock ? ' FOR UPDATE' : ''}`,
+    `SELECT * FROM portal.${entity} WHERE "objectId"=$1 AND ${current} AND ${sharedDocumentScope(entity)}${lock ? ' FOR UPDATE' : ''}`,
     [identity]
   );
   if (!result.rowCount) throw httpError(404, 'Objekt nicht gefunden oder bereits archiviert.');
@@ -82,6 +87,16 @@ export async function updateRecord(
   data: Record<string, any>
 ) {
   const previous = await activeRow(client, entity, identity, true);
+  if (
+    ['document_types', 'document_origins'].includes(entity) &&
+    data.key !== undefined &&
+    data.key !== previous.key
+  )
+    throw fieldError(
+      400,
+      'key',
+      'Der stabile Schlüssel kann nach dem Anlegen nicht geändert werden.'
+    );
   if (previous.id !== expectedId)
     throw httpError(409, 'Dieses Objekt wurde inzwischen geändert. Bitte neu laden.');
   const next = { ...previous, ...data };
@@ -105,6 +120,26 @@ export async function archiveRecord(
   expectedId: string
 ) {
   const row = await activeRow(client, entity, identity, true);
+  if (entity === 'documents' && row.source_entity === 'knowledge_documents') {
+    const linked = await client.query(
+      'SELECT 1 FROM portal.knowledge_documents WHERE "objectId"=$1 AND "archivedAt" IS NULL',
+      [row.source_object_id]
+    );
+    if (linked.rowCount)
+      throw httpError(
+        409,
+        'Das Dokument ist noch mit einem Knowledge-Eintrag verknüpft. Bitte zuerst dort die Verknüpfung entfernen.'
+      );
+  }
+  if (
+    (entity === 'document_types' && ['template', 'other'].includes(row.key)) ||
+    (entity === 'document_origins' &&
+      ['knowledge-management', 'chat-upload', 'ai-generated', 'manual'].includes(row.key))
+  )
+    throw httpError(
+      409,
+      'Dieser Stammdatensatz wird für automatische Dokument-Registrierungen benötigt.'
+    );
   if (row.id !== expectedId)
     throw httpError(409, 'Dieses Objekt wurde inzwischen geändert. Bitte neu laden.');
   // Explicit logical cascades preserve history of authorization relationships.

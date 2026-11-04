@@ -19,7 +19,9 @@ export type SearchResult = {
   total: number;
   page: number;
   limit: number;
+  recordRefs?: Record<string, SearchRecordRef | null>[];
 };
+export type SearchRecordRef = { entity: string; objectId: string; id: string };
 export type SearchView = {
   id: string;
   objectId: string;

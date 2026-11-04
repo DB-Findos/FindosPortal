@@ -4,7 +4,7 @@ export const variableInput = z
     identifier: z.string().regex(/^[A-Z]{1,3}$/),
     entity: z.string().min(1).max(100),
     field: z.string().min(1).max(100),
-    aggregation: z.enum(['MONTH', 'LTM', 'YTD', 'FIXED', 'KPI']),
+    aggregation: z.enum(['MONTH', 'LTM', 'YTD', 'FIXED', 'KPI', 'CUMULATIVE']),
     prior_year: z.boolean().default(false),
     dimension: z.enum(['actual', 'budget', 'forecast', 'plan']).nullable().default(null),
     metric_number: z.number().int().min(0).max(2147483647).nullable().default(null),

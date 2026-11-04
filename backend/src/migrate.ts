@@ -246,6 +246,123 @@ try {
     await client.query("INSERT INTO portal.schema_migrations(name) VALUES ('017-metric-formulas')");
     console.log('Applied 017-metric-formulas.');
   }
+  if (!applied.has('018-capital-movements')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(path.join(projectRoot, 'backend/migrations/018-capital-movements.sql'), 'utf8')
+    );
+    await client.query(
+      "INSERT INTO portal.schema_migrations(name) VALUES ('018-capital-movements')"
+    );
+    console.log('Applied 018-capital-movements.');
+  }
+  if (!applied.has('019-covenant-source-data')) {
+    await client.query(
+      await readFile(
+        path.join(projectRoot, 'backend/migrations/019-covenant-source-data.sql'),
+        'utf8'
+      )
+    );
+    await client.query(
+      "INSERT INTO portal.schema_migrations(name) VALUES ('019-covenant-source-data')"
+    );
+    console.log('Applied 019-covenant-source-data.');
+  }
+  if (!applied.has('020-kpi-data')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(path.join(projectRoot, 'backend/migrations/020-kpi-data.sql'), 'utf8')
+    );
+    await client.query("INSERT INTO portal.schema_migrations(name) VALUES ('020-kpi-data')");
+    console.log(
+      'Applied 020-kpi-data: monthly results, invalidation and durable calculation queue.'
+    );
+  }
+  if (!applied.has('021-kpi-dependency-freshness')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(
+        path.join(projectRoot, 'backend/migrations/021-kpi-dependency-freshness.sql'),
+        'utf8'
+      )
+    );
+    await client.query(
+      "INSERT INTO portal.schema_migrations(name) VALUES ('021-kpi-dependency-freshness')"
+    );
+    console.log('Applied 021-kpi-dependency-freshness: targeted formula recalculation.');
+  }
+  if (!applied.has('022-application-launcher')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(
+        path.join(projectRoot, 'backend/migrations/022-application-launcher.sql'),
+        'utf8'
+      )
+    );
+    await client.query(
+      "INSERT INTO portal.schema_migrations(name) VALUES ('022-application-launcher')"
+    );
+    console.log(
+      'Applied 022-application-launcher: eight applications and Portfolio Reporting section.'
+    );
+  }
+  if (!applied.has('023-comments')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(path.join(projectRoot, 'backend/migrations/023-comments.sql'), 'utf8')
+    );
+    await client.query("INSERT INTO portal.schema_migrations(name) VALUES ('023-comments')");
+    console.log('Applied 023-comments.');
+  }
+  if (!applied.has('024-custom-reports')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(path.join(projectRoot, 'backend/migrations/024-custom-reports.sql'), 'utf8')
+    );
+    await client.query("INSERT INTO portal.schema_migrations(name) VALUES ('024-custom-reports')");
+    console.log('Applied 024-custom-reports.');
+  }
+  if (!applied.has('025-knowledge-management')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(
+        path.join(projectRoot, 'backend/migrations/025-knowledge-management.sql'),
+        'utf8'
+      )
+    );
+    await client.query(
+      "INSERT INTO portal.schema_migrations(name) VALUES ('025-knowledge-management')"
+    );
+    console.log('Applied 025-knowledge-management.');
+  }
+  if (!applied.has('026-document-registry')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(path.join(projectRoot, 'backend/migrations/026-document-registry.sql'), 'utf8')
+    );
+    await client.query(
+      "INSERT INTO portal.schema_migrations(name) VALUES ('026-document-registry')"
+    );
+    console.log('Applied 026-document-registry.');
+  }
+  if (!applied.has('027-knowledge-reviews')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(path.join(projectRoot, 'backend/migrations/027-knowledge-reviews.sql'), 'utf8')
+    );
+    await client.query(
+      "INSERT INTO portal.schema_migrations(name) VALUES ('027-knowledge-reviews')"
+    );
+    console.log('Applied 027-knowledge-reviews.');
+  }
+  if (!applied.has('028-company-details')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(path.join(projectRoot, 'backend/migrations/028-company-details.sql'), 'utf8')
+    );
+    await client.query("INSERT INTO portal.schema_migrations(name) VALUES ('028-company-details')");
+    console.log('Applied 028-company-details.');
+  }
   await client.query(process.argv.includes('--preview') ? 'ROLLBACK' : 'COMMIT');
   console.log(
     process.argv.includes('--preview')

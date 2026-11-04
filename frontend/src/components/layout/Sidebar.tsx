@@ -8,6 +8,7 @@ import {
   Users,
   Search,
   Calculator,
+  LayoutGrid,
 } from 'lucide-react';
 export default function Sidebar() {
   const links = [
@@ -16,6 +17,7 @@ export default function Sidebar() {
     { to: '/settings/search', name: 'Advanced Search', icon: Search },
     { to: '/settings/kpis', name: 'KPIs & Reporting', icon: Calculator },
     { to: '/settings/design', name: 'Design & Layout', icon: Palette },
+    { to: '/settings/applications', name: 'Anwendungen & Links', icon: LayoutGrid },
   ];
   return (
     <aside className="sidebar">

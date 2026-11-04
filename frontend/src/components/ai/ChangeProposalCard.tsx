@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { ChangeProposal } from '../../types/ai';
+import HtmlReportFrame from '../portfolio/custom-reports/HtmlReportFrame';
+import '../portfolio/custom-reports/CustomReportsView.css';
 
 export default function ChangeProposalCard({
   proposal,
@@ -20,6 +22,10 @@ export default function ChangeProposalCard({
       <small>{operations[proposal.operation]}</small>
       {typeof description === 'string' && <p>{description}</p>}
       {typeof formula === 'string' && <code>{formula}</code>}
+      {proposal.entity === 'custom_reports' &&
+        typeof proposal.preview.rendered_html === 'string' && (
+          <HtmlReportFrame html={proposal.preview.rendered_html} title={proposal.title} preview />
+        )}
       <details>
         <summary>Änderungen ansehen</summary>
         <pre>{JSON.stringify(proposal.preview, null, 2)}</pre>

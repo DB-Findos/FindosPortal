@@ -188,7 +188,7 @@ try {
        FROM portal.performance_update_comments WHERE "objectId"=ANY($1::uuid[]) AND "archivedAt" IS NULL`,
       [ids]
     )
-  ).rows as (Omit<CommentRow, 'object_id'> & { object_id: string })[];
+  ).rows as (CommentRow & { version_id: string })[];
   const expected = new Map(records.map((record) => [record.object_id, record]));
   const changed: (CommentRow & { prior_id: string })[] = [];
   for (const row of existing) {

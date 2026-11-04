@@ -9,6 +9,9 @@ import DesignPage from '../pages/DesignPage';
 import AdvancedSearchPage from '../pages/AdvancedSearchPage';
 import KpiSettingsPage from '../pages/KpiSettingsPage';
 import PortfolioPage from '../pages/PortfolioPage';
+import ApplicationsPage from '../pages/ApplicationsPage';
+import ApplicationLinksPage from '../pages/ApplicationLinksPage';
+import KnowledgePage from '../pages/KnowledgePage';
 import '../styles/kpi.css';
 export default function App() {
   return (
@@ -16,8 +19,9 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route index element={<Navigate to="/portfolio/dashboard" replace />} />
+          <Route index element={<ApplicationsPage />} />
           <Route path="portfolio/:view?" element={<PortfolioPage />} />
+          <Route path="knowledge" element={<KnowledgePage />} />
           <Route path="settings" element={<SettingsLayout />}>
             <Route index element={<Navigate to="users" replace />} />
             <Route path="users/:tab?" element={<UserManagementPage />} />
@@ -25,6 +29,7 @@ export default function App() {
             <Route path="design" element={<DesignPage />} />
             <Route path="search" element={<AdvancedSearchPage />} />
             <Route path="kpis" element={<KpiSettingsPage />} />
+            <Route path="applications" element={<ApplicationLinksPage />} />
           </Route>
         </Route>
       </Route>

@@ -1,9 +1,13 @@
 import { app } from './app.js';
 import { pool } from './db.js';
 import { jwtSecret } from './config.js';
+import { startKpiCalculationWorker } from './services/kpi-data/worker.js';
+import { startKnowledgeReviewWorker } from './services/knowledge/reviews.js';
 jwtSecret();
 const port = Number(process.env.PORT || 3001);
 const host = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
+let stopKpiWorker = async () => {};
+let stopKnowledgeReviews = () => {};
 const server = app.listen(port, host, (error?: Error) => {
   if (error) {
     console.error('API startup failed:', error.message);
@@ -12,10 +16,16 @@ const server = app.listen(port, host, (error?: Error) => {
     return;
   }
   console.log(`Findos API + MCP: http://${host}:${port}`);
+  stopKpiWorker = startKpiCalculationWorker();
+  stopKnowledgeReviews = startKnowledgeReviewWorker();
 });
 for (const signal of ['SIGINT', 'SIGTERM'])
-  process.on(signal, () =>
-    server.close(() => {
-      void pool.end().then(() => process.exit(0));
-    })
-  );
+  process.on(signal, () => {
+    stopKnowledgeReviews();
+    void Promise.all([
+      stopKpiWorker(),
+      new Promise<void>((resolve) => server.close(() => resolve())),
+    ])
+      .then(() => pool.end())
+      .then(() => process.exit(0));
+  });

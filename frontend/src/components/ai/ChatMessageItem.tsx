@@ -1,7 +1,7 @@
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import ChatAnswer from './ChatAnswer';
 import type { ChatMessage } from '../../types/ai';
 import ChangeProposalCard from './ChangeProposalCard';
+import ChatActivity from './ChatActivity';
 export default function ChatMessageItem({
   message,
   busy,
@@ -28,21 +28,16 @@ export default function ChatMessageItem({
           </span>
         )}
       </div>
+      {message.role === 'assistant' && !!message.metadata.progress?.length && (
+        <ChatActivity
+          progress={message.metadata.progress}
+          duration={message.response_time_ms}
+          failed={message.status === 'error'}
+        />
+      )}
       <div className="ai-message-content" role={message.status === 'error' ? 'alert' : undefined}>
         {message.role === 'assistant' ? (
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              img: () => null,
-              a: ({ children, href }) => (
-                <a href={href} target="_blank" rel="noopener noreferrer">
-                  {children}
-                </a>
-              ),
-            }}
-          >
-            {message.content}
-          </ReactMarkdown>
+          <ChatAnswer content={message.content} />
         ) : (
           <p>{message.content}</p>
         )}

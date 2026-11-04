@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useViewContent } from './ViewContentContext';
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -22,8 +23,10 @@ type Request = <T = any>(
   body?: unknown,
   versionId?: string
 ) => Promise<T>;
-const ApiContext = createContext<{ request: Request } | null>(null);
+type Upload = <T = any>(path: string, file: File) => Promise<T>;
+const ApiContext = createContext<{ request: Request; upload: Upload } | null>(null);
 export function ApiProvider({ children }: { children: ReactNode }) {
+  const { recordRead } = useViewContent();
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     const refresh = () => setRevision((value) => value + 1);
@@ -32,6 +35,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
   }, []);
   const request: Request = useCallback(
     async (path, method = 'GET', body, versionId) => {
+      const record = recordRead(path, method);
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'X-Requested-With': 'FindosPortal',
@@ -54,11 +58,34 @@ export function ApiProvider({ children }: { children: ReactNode }) {
           result.fieldErrors || {}
         );
       }
+      record(result);
       return result;
     },
-    [revision]
+    [revision, recordRead]
   );
-  const value = useMemo(() => ({ request }), [request]);
+  const upload: Upload = useCallback(async (path, file) => {
+    const response = await fetch('/api' + path, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-Requested-With': 'FindosPortal',
+        'X-File-Name': encodeURIComponent(file.name),
+      },
+      body: file,
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      if (response.status === 401) window.dispatchEvent(new Event('session-expired'));
+      throw new ApiError(
+        response.status,
+        result.error || 'Upload fehlgeschlagen.',
+        result.fieldErrors || {}
+      );
+    }
+    return result;
+  }, []);
+  const value = useMemo(() => ({ request, upload }), [request, upload]);
   return <ApiContext.Provider value={value}>{children}</ApiContext.Provider>;
 }
 export function useApi() {
