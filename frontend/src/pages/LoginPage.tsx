@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Brand from '../components/layout/Brand';
 import { useFormErrors } from '../hooks/useFormErrors';
 import FieldError from '../components/common/FieldError';
+import MicrosoftLoginButton from '../components/auth/MicrosoftLoginButton';
 export default function LoginPage() {
   const { request: api } = useApi();
   const { user, loading, refresh: onLogin } = useAuth();
@@ -86,6 +87,7 @@ export default function LoginPage() {
             <ChevronRight size={17} />
           </button>
         </form>
+        <MicrosoftLoginButton />
         <div className="login-footer">
           <ShieldCheck size={15} /> Geschützter Zugang
         </div>

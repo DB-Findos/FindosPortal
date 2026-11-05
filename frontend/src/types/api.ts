@@ -16,6 +16,7 @@ export type Entity = {
   permissions: Record<string, boolean>;
 };
 export type User = {
+  pending_access?: boolean;
   id: string;
   email: string;
   first_name: string;

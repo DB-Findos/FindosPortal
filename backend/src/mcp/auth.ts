@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { jwtSecret } from '../config.js';
 import { pool } from '../db.js';
 import { httpError } from '../shared/errors.js';
+import { hasPendingAccess } from '../services/auth/access.js';
 
 declare global {
   namespace Express {
@@ -34,6 +35,8 @@ export const authenticateMcp: RequestHandler = async (req, res, next) => {
       ).rowCount
     )
       throw httpError(401, 'MCP Nutzer nicht aktiv.');
+    if (await hasPendingAccess(id))
+      throw httpError(403, 'Benutzerkonto noch nicht freigeschaltet.');
     req.userId = id;
     req.mcpWrite = payload.scopes.includes('write');
     next();

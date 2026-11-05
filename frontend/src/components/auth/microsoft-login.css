@@ -1,0 +1,26 @@
+.microsoft-login {
+  margin-top: 22px;
+}
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted, #738077);
+  font-size: 12px;
+  margin-bottom: 18px;
+}
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border, #e1e8e2);
+}
+.microsoft-login-button {
+  width: 100%;
+  min-height: 43px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}

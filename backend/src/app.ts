@@ -28,7 +28,15 @@ app.use('/api', (req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     const allowed = [process.env.APP_ORIGIN || 'http://127.0.0.1:5173'];
-    if (!production) allowed.push(`http://127.0.0.1:${process.env.PORT || 3001}`);
+    if (!production) {
+      allowed.push(`http://127.0.0.1:${process.env.PORT || 3001}`);
+      allowed.push(`http://localhost:${process.env.PORT || 3001}`);
+      const localFrontend = new URL(allowed[0]);
+      if (['localhost', '127.0.0.1'].includes(localFrontend.hostname)) {
+        localFrontend.hostname = localFrontend.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+        allowed.push(localFrontend.origin);
+      }
+    }
     if (req.get('origin') && !allowed.includes(req.get('origin')!))
       return void res.status(403).json({ error: 'Unzulässiger Ursprung.' });
     if (req.get('x-requested-with') !== 'FindosPortal')

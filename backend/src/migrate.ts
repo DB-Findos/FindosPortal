@@ -363,6 +363,14 @@ try {
     await client.query("INSERT INTO portal.schema_migrations(name) VALUES ('028-company-details')");
     console.log('Applied 028-company-details.');
   }
+  if (!applied.has('029-entra-login')) {
+    await beginAuditedImport(client);
+    await client.query(
+      await readFile(path.join(projectRoot, 'backend/migrations/029-entra-login.sql'), 'utf8')
+    );
+    await client.query("INSERT INTO portal.schema_migrations(name) VALUES ('029-entra-login')");
+    console.log('Applied 029-entra-login: Microsoft identities and Inactive onboarding group.');
+  }
   await client.query(process.argv.includes('--preview') ? 'ROLLBACK' : 'COMMIT');
   console.log(
     process.argv.includes('--preview')

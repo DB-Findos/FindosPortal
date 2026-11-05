@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { production, jwtSecret } from '../config.js';
 import { pool } from '../db.js';
 import { authenticate, permissions } from '../middleware/auth.js';
+import { establishSession, sessionCookie } from '../services/auth/session.js';
+import { hasPendingAccess } from '../services/auth/access.js';
+import { entraRouter } from './entra.js';
 export const authRouter = Router();
-const cookie = { httpOnly: true, secure: production, sameSite: 'strict' as const, path: '/' };
+authRouter.use('/entra', entraRouter);
 authRouter.post(
   '/login',
   rateLimit({ windowMs: 900000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false }),
@@ -27,17 +28,13 @@ authRouter.post(
     );
     if (!user?.active || !valid)
       return void res.status(401).json({ error: 'E-Mail oder Passwort ist falsch.' });
-    const token = jwt.sign({}, jwtSecret(), {
-      subject: user.objectId,
-      expiresIn: '8h',
-      algorithm: 'HS256',
-      issuer: 'findos-portal',
-      audience: 'findos-web',
-    });
-    res.cookie('session', token, { ...cookie, maxAge: 28800000 }).json({ ok: true });
+    establishSession(res, user.objectId);
+    res.json({ ok: true });
   }
 );
-authRouter.post('/logout', (_req, res) => res.clearCookie('session', cookie).json({ ok: true }));
+authRouter.post('/logout', (_req, res) =>
+  res.clearCookie('session', sessionCookie).json({ ok: true })
+);
 authRouter.get('/me', authenticate, async (req, res) => {
   const user = (
     await pool.query(
@@ -45,5 +42,10 @@ authRouter.get('/me', authenticate, async (req, res) => {
       [req.userId]
     )
   ).rows[0];
-  res.json({ ...user, permissions: await permissions(req.userId!) });
+  const pendingAccess = await hasPendingAccess(req.userId!);
+  res.json({
+    ...user,
+    pending_access: pendingAccess,
+    permissions: pendingAccess ? {} : await permissions(req.userId!),
+  });
 });

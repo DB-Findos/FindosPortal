@@ -60,6 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const work = (async () => {
       const me = await requestRef.current<User>('/auth/me');
       if (version !== sessionVersion.current) return;
+      if (me.pending_access) {
+        navigationRef.current = null;
+        setEntities([]);
+        setNavigation([]);
+        setPortfolioCompanies([]);
+        setPortfolioFunds([]);
+        setNavigationError('');
+        setUser(me);
+        return;
+      }
       if (!navigationRef.current || navigationRef.current.userId !== me.id) {
         navigationRef.current = {
           userId: me.id,

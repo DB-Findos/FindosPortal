@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { jwtSecret } from '../config.js';
 import { pool } from '../db.js';
 import { httpError } from '../shared/errors.js';
+import { hasPendingAccess } from '../services/auth/access.js';
 declare global {
   namespace Express {
     interface Request {
@@ -23,6 +24,11 @@ export const authenticate: RequestHandler = async (req, _res, next) => {
       [payload.sub]
     );
     if (!result.rowCount) throw httpError(401, 'Bitte anmelden.');
+    if (req.originalUrl.split('?')[0] !== '/api/auth/me' && (await hasPendingAccess(payload.sub)))
+      throw httpError(
+        403,
+        'Ihr Benutzerkonto wartet auf die Freischaltung durch einen Administrator.'
+      );
     req.userId = payload.sub;
     next();
   } catch (error) {
@@ -30,6 +36,7 @@ export const authenticate: RequestHandler = async (req, _res, next) => {
   }
 };
 export async function permissions(userId: string) {
+  if (await hasPendingAccess(userId)) return {};
   const result = await pool.query(
     `SELECT e.name,bool_or(p.can_create) AS can_create,bool_or(p.can_read) AS can_read,bool_or(p.can_update) AS can_update,bool_or(p.can_delete) AS can_delete
  FROM portal.permissions p JOIN portal.entities e ON e."objectId"=p.entity_id AND e."archivedAt" IS NULL
